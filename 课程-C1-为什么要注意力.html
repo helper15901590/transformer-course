@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C1 · 为什么要注意力 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .tok-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .tok{font-family:var(--sans);font-size:16px;padding:8px 13px;border-radius:9px;border:1px solid var(--rule-strong);background:#FBFCFE;color:var(--ink);cursor:pointer;transition:.15s}
+  .tok:hover{border-color:var(--ink)}
+  .tok.active{border-color:var(--signal);color:var(--signal);font-weight:700;background:#fff}
+  .tok.rel{border-color:var(--teal);background:rgba(14,154,167,.12);color:#0B6E78;font-weight:700}
+  .tcap{font-size:14.5px;color:var(--ink-soft);min-height:3em}.tcap b{color:var(--ink)}
+  .diag{display:flex;gap:22px;flex-wrap:wrap;margin:1.2em 0}
+  .diag .col{flex:1;min-width:240px;background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:16px}
+  .diag .col h4{margin:0 0 12px;font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft)}
+  .chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:var(--mono);font-size:13px;color:var(--ink-soft)}
+  .chain .b{width:30px;height:30px;border-radius:7px;border:1px solid var(--rule-strong);display:flex;align-items:center;justify-content:center;background:#fff}
+  .chain .ar{color:var(--ink-faint)}
+  .fan{text-align:center;font-family:var(--mono);font-size:13px;color:var(--ink-soft)}
+  .fan .mid{display:inline-block;padding:6px 14px;border:2px solid var(--signal);color:var(--signal);border-radius:8px;font-weight:700}
+  .fan .leaves{display:flex;gap:6px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+  .fan .leaves span{width:30px;height:30px;border-radius:7px;border:1px solid var(--teal);background:rgba(14,154,167,.1);display:flex;align-items:center;justify-content:center}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">C1 · 为什么要注意力</span><span><a href="课程-B2-向量里装了什么.html">← 回 B2</a> 　·　 第 6 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>让“表”里每个词能互相看——这是整机“改写表”的<strong>核心动作</strong>。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 C · 注意力的直觉 · 第 1 关</p>
+    <h1>为什么要注意力：<br>开会 vs 传话</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>词已经能变成一串数字了。但一句话是很多词连在一起，怎么让它们“互相认识”？老办法像<strong>传话游戏</strong>，又慢又健忘；新办法叫<strong>注意力</strong>，像<strong>开会</strong>。这关先把两种画面分清楚。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>句子是“小猫 蹲在 垫子上，因为 它 累了”。要让电脑明白“它”指的是“小猫”：“它”离“小猫”隔了好几个词。下面两种办法，哪个更容易把“它”和“小猫”连上？</p>
+    <div class="guess">
+      <button data-g="pass">传话游戏：一个一个往后传</button>
+      <button data-g="meet">开会：大家同时在场，直接看</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">先读一句话：<strong>“小猫 蹲在 垫子 上，因为 它 累了。”</strong></p>
+    <p>读到“它”时，你几乎马上明白：“它 = 小猫”。你怎么知道的？——你<strong>回头看了前面几个词</strong>，一眼认出“小猫”和“它”对得上。</p>
+    <p>电脑也得干这件事。老办法我们叫它 <span class="hl">“传话游戏”</span>（正式名字叫 RNN，一种“一个词一个词往后读”的机器）。想想小时候的传话：第一个悄悄告诉第二个，第二个再告诉第三个……传到后面，话早变味了。这台老机器就这么读句子：<strong>读完一个词，把“记住的东西”交给下一个词</strong>，一个接一个。</p>
+    <p>它有明显的毛病（下一节细说）。于是 2017 年那篇论文换了个新办法——<span class="hl">“开会”</span>，也就是这门课的主角：<strong>注意力</strong>。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>开会</strong>”。“它”要认“小猫”，开会时直接看就行；传话游戏得把信息从“小猫”一路往后传好几个词，容易传丢。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p><strong>传话游戏</strong>＝一个词一个词往后传，又慢又容易忘；<strong>开会</strong>＝所有词同时在场，谁重要就<strong>直接看谁</strong>，不用一个个传。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 这关只讲“为什么”，不讲“怎么算”。</strong>“注意力怎么分给各个词、怎么换成百分比”，接下来的 C2、C3 就讲；把它写成 Q、K、V 的完整式子，要到 D 阶段。</p>
+      <p><strong>② “开会”只是比喻，别停在比喻上。</strong>它真正指的是：每个词能<strong>直接取用别的词的信息</strong>，不用一个个传。</p>
+      <p><strong>③ 开会 ≠ 平均地看每个词。</strong>谁重要就多看谁——“它”会主要盯着“小猫”。（下一关专门讲这个“轻重”。）</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>“传话游戏”（RNN）有三个毛病：</p>
+    <ul>
+      <li><strong>慢。</strong>必须一个接一个地读，读完第 1 个才能读第 2 个……没法同时进行。</li>
+      <li><strong>忘。</strong>记住的东西靠一个个往后传，传得越远，越容易变淡、走样。</li>
+      <li><strong>远的难搭上。</strong>“它”要和前面好几个词之外的“小猫”搭上关系，信息得一路传过去，传着传着就丢了。</li>
+    </ul>
+    <p>换成“开会”（注意力）呢？<strong>所有词一起在场</strong>。每个词想看谁就<strong>直接看谁</strong>——“它”要认“小猫”，一步就到，中间隔几个词都无所谓。</p>
+    <div class="diag">
+      <div class="col"><h4>传话游戏（RNN）：一个个往后传</h4>
+        <div class="chain"><span class="b">词1</span><span class="ar">→</span><span class="b">词2</span><span class="ar">→</span><span class="b">词3</span><span class="ar">→</span><span class="b">词4</span><span class="ar">→</span><span class="b">…</span></div>
+        <p class="cap" style="text-align:left;margin-top:10px">只能顺着传，隔得远就难连上。</p>
+      </div>
+      <div class="col"><h4>开会（注意力）：谁都看得到</h4>
+        <div class="fan"><span class="mid">“它”</span><div class="leaves"><span>小猫</span><span>蹲在</span><span>垫子</span><span>累了</span></div></div>
+        <p class="cap" style="text-align:left;margin-top:10px">想看谁就看谁，一步到位。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p>下面就是那句话，每个词都能点。<strong>先猜</strong>：点“它”时，哪个词会被连上？猜完再点，看对不对。</p>
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 读到这个词，你会回头看谁</span></div>
+      <div class="card-b">
+        <div class="tok-row" id="toks"></div>
+        <div class="tcap" id="tcap">点一个词试试（比如点“它”）。</div>
+      </div>
+    </div>
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 点“它”，看它连到了哪个词——是“小猫”吗？<br>2. 再点“累了”，看它和“小猫”有没有关系。<br>3. 想一想：如果让“传话游戏”来干这事，“它”想连上“小猫”，得怎么办？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">“它”一下就连到“小猫”。用传话游戏，“它”在句子很靠后，想和“小猫”搭上关系，信息得从“小猫”一路往后传好几个词，很容易丢。开会（注意力）就不用——直接看就行。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>“传话游戏”这种老办法（RNN），最大的毛病是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>必须联网才能用</span></div><div class="opt" data-a="B"><span class="k">B</span><span>只能一个词一个词往后读，又慢、传久了还容易忘</span></div><div class="opt" data-a="C"><span class="k">C</span><span>只能读英文，不能读中文</span></div><div class="opt" data-a="D"><span class="k">D</span><span>太占内存</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B</strong>。它必须排着队一个一个读（慢），信息靠一个个往后传（容易忘、走样）。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>“开会”（注意力）比传话游戏，最大的好处是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>每个词能直接看到其他词，不用一个个传</span></div><div class="opt" data-a="B"><span class="k">B</span><span>用的词更少</span></div><div class="opt" data-a="C"><span class="k">C</span><span>不用电脑也能算</span></div><div class="opt" data-a="D"><span class="k">D</span><span>能把句子变短</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。开会时所有词同时在场，想和谁搭上关系直接看就行。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：用传话游戏的办法，两个隔得很远的词想搭上关系，得把信息一路传过去，容易走样。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。这正是传话游戏的毛病：隔得越远，越难连上。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>判断：在“注意力（开会）”里，一个词只能看到紧挨着它的前后两个词。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。开会时每个词能看到<strong>所有</strong>词，不管隔多远，不是只看前后两个。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】把句子改成“小猫……（中间隔了 10 个词）……它 累了”。用传话游戏，“它”还容不容易连上“小猫”？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>更难了，信息要传 10 步，更容易丢</span></div><div class="opt" data-a="B"><span class="k">B</span><span>更容易了，隔得远反而好连</span></div><div class="opt" data-a="C"><span class="k">C</span><span>没影响，和隔多远无关</span></div><div class="opt" data-a="D"><span class="k">D</span><span>传话游戏会自动跳过中间的词</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。传话游戏隔得越远越难连上（要传 10 步）；开会的办法则不受影响，一律一步直达。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li><strong>传话游戏（RNN）</strong>：一个词一个词往后传，又慢又容易忘，隔得远就难连。</li>
+        <li><strong>开会（注意力）</strong>：所有词同时在场，谁重要就<strong>直接看谁</strong>，一步直达。</li>
+        <li>这关只讲“为什么”。怎么分注意力在 C2、C3，写成 Q、K、V 的完整式子要到 D 阶段。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-C2-如何分配注意力.html">✅ 过关，进入下一关：C2 · 每个词如何分配注意力 →</a>
+      <div class="pending">如果点不动（比如在预览小窗里），就 <a href="课程-C2-如何分配注意力.html" style="color:var(--violet)">在新窗口打开 C2</a>，或回一句"<b>开 C2</b>"；也可以 <a href="课程-B2-向量里装了什么.html" style="color:var(--violet)">回 B2 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · C1 · 为什么要注意力</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='meet'
+      ? '<strong>猜对了！</strong>开会时所有词同时在场，“它”直接看“小猫”就行，不用一个个传。'
+      : '<strong>你选了“传话”。</strong>可惜传话游戏隔得远就容易丢——正是开会（注意力）解决了这个问题。';
+  }));
+
+  const TOKENS=['小猫','蹲在','垫子','上','，','因为','它','累了'];
+  const REL={0:[6,1,7],6:[0],1:[0,2],2:[1,3],7:[0,6],5:[6,7],3:[2],4:[5]};
+  const row=$('#toks');
+  row.innerHTML=TOKENS.map((t,i)=>`<button class="tok" data-i="${i}">${t}</button>`).join('');
+  const cap=$('#tcap');
+  function pick(i){
+    $$('.tok',row).forEach(b=>{const k=+b.dataset.i;b.classList.toggle('active',k===i);b.classList.toggle('rel',i>=0&&(REL[i]||[]).includes(k));});
+    if(i<0){cap.textContent='点一个词试试（比如点“它”）。';return;}
+    const w=TOKENS[i],rel=(REL[i]||[]).map(k=>TOKENS[k]);
+    if(rel.length===0){cap.innerHTML=`读 <b>“${w}”</b> 时，它没什么要特别回头的词。`;return;}
+    cap.innerHTML=`读到 <b>“${w}”</b> 时，你会回头看：<b>${rel.join('、')}</b>。看，是直接连过去的，不用一个个传。`;
+  }
+  $$('.tok',row).forEach(b=>b.addEventListener('click',()=>pick(+b.dataset.i)));
+  pick(-1);
+
+  const CORRECT={'1':'B','2':'A','3':'T','4':'F','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经分得清：<strong>传话游戏（一个个传、又慢又忘）</strong> 和 <strong>开会（同时看、直接连）</strong>，也知道了为什么要换成“注意力”。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

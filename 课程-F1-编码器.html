@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 · 编码器 × 6 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .flow{display:flex;flex-direction:column;gap:6px;max-width:460px;margin:0 auto 6px}
+  .fstep{border:1px solid var(--rule-strong);border-radius:9px;padding:8px 14px;text-align:center;font-size:13.5px;background:#FBFCFE}
+  .fstep.att{background:rgba(108,92,231,.08);border-color:var(--violet)}
+  .fstep.ffn{background:rgba(242,178,62,.12);border-color:#D9A02E}
+  .fstep.norm{font-family:var(--mono);font-size:12px;color:var(--ink-soft);border-style:dashed}
+  .farrow{text-align:center;color:var(--ink-faint);font-family:var(--mono);font-size:14px}
+  .stack{display:flex;flex-direction:column-reverse;gap:4px;max-width:460px;margin:0 auto}
+  .slayer{border:1px solid var(--violet);border-radius:8px;padding:6px 12px;text-align:center;font-size:12px;color:var(--violet);background:rgba(108,92,231,.05)}
+  .stacktag{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-align:center;margin-top:8px}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">F1 · 编码器 × 6</span><span><a href="课程-E4-FFN.html">← 回 E4</a> 　·　 第 18 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>E 段做出“一层”了，这关把它<strong>堆 6 层</strong>，变成“读懂整句”的编码器。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 F · 整机与训练 · 第 1 关</p>
+    <h1>编码器 × 6：<br>把“一层”叠成“读懂整句”</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>E 段你已经有了“一层”（多头注意力 + FFN，各带残差和 Norm）。这关把这层<strong>原样复制 6 份、首尾相接</strong>，就得到编码器——负责把源语言句子“读懂”。学完你就知道整机的左半边长什么样。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>一层“加工”还不够深入。要让机器把一句话读得更透，可以怎么办？</p>
+    <div class="guess">
+      <button data-g="stack">把同一层复制 6 份、首尾相接叠起来</button>
+      <button data-g="wide">把一层做得特别宽、特别大</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">一层只“读”一遍。读一遍，每个词只吸收到“邻居”的信息；多读几遍，才越读越懂。</p>
+    <p>做法不是把一层做得更宽，而是<strong>把同一层复制 6 份，首尾相接</strong>——第 1 层的输出，喂给第 2 层；第 2 层的输出，喂给第 3 层……这样句子被“加工”6 遍，每个词越读越懂上下文。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>叠 6 层</strong>”。论文选的就是叠 6 层相同结构，而不是把一层做特别宽。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p>编码器 = <strong>6 层相同结构首尾相接</strong>，把句子加工 6 遍，越读越懂。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 6 层是“相同结构”复制，不是 6 种不同的层。</strong>每层内部一样，只是各自的权重（参数）不同、各学各的。</p>
+      <p><strong>② 是“首尾相接”，不是“并行”。</strong>第 2 层吃第 1 层的输出，一层接一层。</p>
+      <p><strong>③ 编码器输出的是“读懂了整句的每个词”，不是只给一个结果。</strong>它把整句都编码好，供解码器用。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>先把“一层”的样子回忆清楚（E 段拼出来的）：</p>
+    <div class="flow">
+      <div class="fstep att">多头注意力（跨词通信）</div>
+      <div class="farrow">↓ 残差 + LayerNorm</div>
+      <div class="fstep ffn">FFN（逐词加工）</div>
+      <div class="farrow">↓ 残差 + LayerNorm</div>
+    </div>
+    <p>然后把这一层<strong>叠 6 份</strong>：</p>
+    <div class="stack">
+      <div class="slayer">第 1 层（多头 + FFN）</div>
+      <div class="slayer">第 2 层</div>
+      <div class="slayer">第 3 层</div>
+      <div class="slayer">第 4 层</div>
+      <div class="slayer">第 5 层</div>
+      <div class="slayer">第 6 层</div>
+    </div>
+    <div class="stacktag">× 6（自下而上：词先进第 1 层，一路往上到第 6 层）</div>
+    <p>整条数据流：<strong>词向量 → 加位置编码 → 6 层 → 输出“读懂的每个词”</strong>。编码器到此完工。</p>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：读第 1 遍时，“它”能马上连上“小猫”吗？还是得多读几遍？猜完看下面的图。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 读几遍，才越读越懂</span></div>
+      <div class="card-b">
+        <div id="reads" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 看第 1 遍：“它”只看到了旁边的词，还没认出“小猫”。<br>2. 看第 2 遍：信息传开了一点，“它”离“小猫”近了一步。<br>3. 看第 6 遍：“它”已经完全认出了“小猫”——这就是“越读越懂”。</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">一层注意力只能让每个词看到“一步之内”的词；叠 6 层，信息就一层层传开，远一点的词也能连上。所以“小猫……它”隔得远也没关系——6 层下来就懂了。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>编码器是怎么从“一层”来的？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>把同一层复制 6 份，首尾相接叠起来</span></div><div class="opt" data-a="B"><span class="k">B</span><span>把一层做得特别宽</span></div><div class="opt" data-a="C"><span class="k">C</span><span>用 6 种完全不同的结构拼起来</span></div><div class="opt" data-a="D"><span class="k">D</span><span>只算一次，不多算</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。6 层相同结构首尾相接，每层各自有独立参数。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>为什么叠 6 层，比只算 1 层更好？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>多读几遍，信息一层层传开，每个词越读越懂上下文</span></div><div class="opt" data-a="B"><span class="k">B</span><span>让文件更小</span></div><div class="opt" data-a="C"><span class="k">C</span><span>让词变多</span></div><div class="opt" data-a="D"><span class="k">D</span><span>没有原因</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。一层只让词看到“邻居”，叠 6 层信息层层传开，远处的词也能连上。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：6 层的结构各不相同，第 1 层和第 6 层是两种东西。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。6 层<strong>结构相同</strong>（都是多头+FFN），只是各自的参数不同。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>判断：编码器输出的是“读懂了整句的每个词”，供解码器用。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。编码器把整句都编码好（每个词都带上下文），不是只出一个结果。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】词进入编码器后，经过的正确顺序是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>词向量 → 加位置编码 → 6 层 → 输出</span></div><div class="opt" data-a="B"><span class="k">B</span><span>6 层 → 加位置编码 → 词向量</span></div><div class="opt" data-a="C"><span class="k">C</span><span>加位置编码 → 输出 → 6 层</span></div><div class="opt" data-a="D"><span class="k">D</span><span>输出 → 词向量 → 6 层</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。先把词变向量、加位置编码（E2），再过 6 层，最后输出。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>编码器 = <strong>6 层相同结构首尾相接</strong>（不是把一层做宽）。</li>
+        <li>每层结构一样（多头+FFN），只是<strong>参数各不同</strong>。</li>
+        <li>数据流：<strong>词向量 → 位置编码 → 6 层 → 读懂的每个词</strong>。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-F2-解码器.html">✅ 过关，进入下一关：F2 · 解码器 + 掩码 →</a>
+      <div class="pending">如果点不动（比如在预览小窗里）——F2 还没生成——回一句"<b>开 F2</b>"，我就把它做出来；也可以 <a href="课程-E4-FFN.html" style="color:var(--violet)">回 E4 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · F1 · 编码器 × 6</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='stack'
+      ? '<strong>猜对了！</strong>叠 6 层相同结构，让句子被加工 6 遍，越读越懂。'
+      : '<strong>你选了“做宽”。</strong>论文的做法其实是叠 6 层——重复加工，让信息层层传开。';
+  }));
+
+  // 读几遍的示意
+  const READS=[
+    {t:'第 1 遍',d:'每个词只看到“一步之内”的邻居。“它”还没认出“小猫”。'},
+    {t:'第 2 遍',d:'信息传开了一点，“它”离“小猫”近了一步。'},
+    {t:'第 3~5 遍',d:'信息越传越远……'},
+    {t:'第 6 遍',d:'“它”完全认出了“小猫”——越读越懂。'}
+  ];
+  $('#reads').innerHTML=READS.map((r,i)=>`<div style="display:flex;gap:12px;align-items:flex-start;border:1px solid ${i===READS.length-1?'var(--good)':'var(--rule)'};border-radius:9px;padding:10px 14px;background:${i===READS.length-1?'rgba(47,163,107,.07)':'#FBFCFE'}"><b style="font-family:var(--mono);font-size:12px;color:${i===READS.length-1?'var(--good)':'var(--ink-soft)'};flex:none">${r.t}</b><span style="font-size:14px;color:var(--ink-soft)">${r.d}</span></div>`).join('');
+
+  const CORRECT={'1':'A','2':'A','3':'F','4':'T','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经懂：<strong>编码器 = 6 层相同结构首尾相接，把句子加工 6 遍、越读越懂</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

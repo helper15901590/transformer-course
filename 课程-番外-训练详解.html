@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番外 · 大模型训练三阶段：深度详解</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:820px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:820px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:820px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(26px,5.2vw,40px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.05em}.lead{font-size:1.08em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.05em}li{margin:.3em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.3em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .note.good{border-left-color:var(--good);background:rgba(47,163,107,.07)}.note.good .tag{color:var(--good)}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.5em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+  .tabs button{border:1px solid var(--rule-strong);border-radius:8px;padding:10px 16px;font-size:14px}
+  .tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .sec{display:none}
+  .sec.on{display:block}
+  .sub{border:1px solid var(--rule);border-radius:12px;background:#FBFCFE;padding:16px 18px;margin:0 0 14px}
+  .sub h4{margin:0 0 8px;font-size:15px;font-family:var(--serif);font-weight:700;color:var(--ink)}
+  .sub h4 .ic{font-family:var(--mono);font-size:12px;color:var(--signal);margin-right:6px;font-weight:700}
+  .sub p{font-size:14.5px;color:var(--ink-soft);margin:0 0 .5em}
+  .sub p:last-child{margin-bottom:0}
+  .sub ul{font-size:14.5px;color:var(--ink-soft)}
+  .tl{position:relative;margin:1em 0 1em 12px;padding-left:22px;border-left:2px solid var(--rule-strong)}
+  .tl .ev{position:relative;margin:0 0 12px}
+  .tl .ev::before{content:"";position:absolute;left:-28px;top:8px;width:10px;height:10px;border-radius:50%;background:var(--signal);box-shadow:0 0 0 3px rgba(226,62,87,.15)}
+  .tl .ev .y{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--signal)}
+  .tl .ev .d{font-size:14px;color:var(--ink-soft)}
+  table.cmp{border-collapse:collapse;width:100%;font-size:14px;background:#fff;border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+  table.cmp th,table.cmp td{padding:9px 13px;border-bottom:1px solid var(--rule);text-align:left}
+  table.cmp th{font-family:var(--mono);font-size:11px;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC}
+  table.cmp tr:last-child td{border-bottom:none}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:820px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">番外 · 训练三阶段（深度版）</span><span><a href="课程-00-Transformer全景图.html">全景图</a> · 加餐课</span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>把"预训练 → SFT → 对齐"每个阶段的<strong>历史、命名、作用、原理、目的、注意事项</strong>全讲透。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">番外 · 加餐课（深度版）</p>
+    <h1>大模型训练三阶段：<br>历史 · 命名 · 原理 · 坑</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>不止告诉你"有三步"，而是把每一步讲透：<strong>它从哪来（发展历史）、为什么叫这个名（命名逻辑）、干嘛用的（作用）、怎么工作的（原理）、图什么（目的）、会踩什么坑（注意事项）</strong>。学完你能跟别人把这套东西从头讲到尾。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 总览 → 预训练 → SFT → 对齐 → 检核 → 带走</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>一个"上知天文下知地理"的基座模型（预训练完的），你问它"1+1=？"，它却答非所问地乱续写。这是为什么？</p>
+    <div class="guess">
+      <button data-g="a">它其实不会，知识是假的</button>
+      <button data-g="b">它会，但它只会"续写"，没人教它"按答案回答"</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，答案在"SFT"那部分揭晓。）</p>
+  </section>
+
+  <!-- 总览 -->
+  <section class="step" id="s0">
+    <div class="sh"><span class="num">⓪</span><h2>总览：三个阶段，各管一摊</h2><span class="en">Overview</span></div>
+    <p class="lead">先看全貌，再逐个深挖。</p>
+    <div style="overflow-x:auto"><table class="cmp">
+      <thead><tr><th>阶段</th><th>一句人话</th><th>要人标吗</th><th>成本</th><th>产物</th></tr></thead>
+      <tbody>
+        <tr><td><strong>预训练</strong></td><td>读完全网，学会语言和知识</td><td>不要</td><td>极贵</td><td>基座模型（会续写）</td></tr>
+        <tr><td><strong>SFT 微调</strong></td><td>教它"别人问，你要好好答"</td><td>要（问答对）</td><td>便宜</td><td>指令模型（会回答）</td></tr>
+        <tr><td><strong>对齐</strong></td><td>教它"有用、诚实、无害"</td><td>要（偏好）</td><td>便宜</td><td>聊天助手（会做人）</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note"><span class="tag">为什么是这三个阶段</span><p>这是历史一路"踩坑"踩出来的最优分工：先解决"懂不懂"（预训练），再解决"听不听话"（SFT），最后解决"合不合口味"（对齐）。每个阶段解决前一个阶段留下的问题。</p></div>
+  </section>
+
+  <!-- 三个 tab 的切换按钮 -->
+  <section class="step" id="s-main">
+    <div class="tabs" id="tabs">
+      <button data-t="1" class="on">① 预训练 Pre-training</button>
+      <button data-t="2">② 微调 SFT</button>
+      <button data-t="3">③ 对齐 RLHF / DPO</button>
+    </div>
+
+    <!-- ========== 阶段一：预训练 ========== -->
+    <div class="sec on" id="sec1">
+      <div class="sub">
+        <h4><span class="ic">📜</span>发展历史：这条路是怎么走出来的</h4>
+        <div class="tl">
+          <div class="ev"><span class="y">2013</span><div class="d"><strong>Word2Vec</strong>：第一次把"词"变成向量，但只看局部几个词的窗口，看不到全局。</div></div>
+          <div class="ev"><span class="y">2017</span><div class="d"><strong>Transformer</strong>：注意力机制登场——这就是你前面 23 关学的那个东西，能并行、能看全局。为"大模型"铺平了路。</div></div>
+          <div class="ev"><span class="y">2018</span><div class="d"><strong>GPT-1</strong>：第一次提出"预训练 + 微调"的范式——先在海量文本上练，再针对具体任务小调。注意，它用的是<strong>解码器</strong>（就是后来 GPT 家族的老祖宗）。</div></div>
+          <div class="ev"><span class="y">2018</span><div class="d"><strong>BERT</strong>：同年，谷歌推出"只用编码器"的 BERT，靠"完形填空"训练（遮住中间词猜）。它火了一阵，但不会生成，后来让位给了 GPT 路线。</div></div>
+          <div class="ev"><span class="y">2019</span><div class="d"><strong>GPT-2</strong>：更大。发现一个神奇现象——<strong>不需要专门微调，直接让它接着写，很多任务它自己就会了</strong>（zero-shot）。</div></div>
+          <div class="ev"><span class="y">2020</span><div class="d"><strong>GPT-3</strong>：1750 亿参数，"大力出奇迹"的巅峰——给几个例子（few-shot）就能干各种活。从此"越大越强"成为信仰。</div></div>
+          <div class="ev"><span class="y">2022</span><div class="d"><strong>Chinchilla</strong>：DeepMind 泼了盆冷水——发现"模型和数据的量要匹配"，光堆参数不堆数据是浪费。开始转向"数据质量"。</div></div>
+          <div class="ev"><span class="y">之后</span><div class="d">单纯的"堆大"边际收益递减，大家转而拼<strong>数据质量、合成数据、更聪明的后训练</strong>。</div></div>
+        </div>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">🏷️</span>命名逻辑：这几个词到底啥意思</h4>
+        <ul>
+          <li><strong>预训练（pre-training）</strong>：英文前缀 pre- = "在……之前"。在干正事（微调）<strong>之前</strong>先做的训练，所以叫"预"训练。</li>
+          <li><strong>自监督（self-supervised）</strong>：监督学习要人给标签，而这里<strong>标签就是数据自己</strong>——下一个字就是答案，不用人标。所以叫"自"监督。</li>
+          <li><strong>语言模型（language model）</strong>：它的输出是"下一个字是什么"的<strong>概率分布</strong>，即 P(下一个词 | 前面所有词)。这就是"语言"的"模型"。</li>
+          <li><strong>token</strong>：不是"字"也不是"词"，是"子词"——切分的最小单元（比如"学习"可能是一个 token，"transformer"可能被切成几段）。</li>
+          <li><strong>BPE（Byte Pair Encoding，字节对编码）</strong>：分词算法，反复把"最常一起出现的两个相邻字符/片段"合并成一个新片段。名字里的"字节对"就是指"两个字节成对合并"。</li>
+          <li><strong>loss / 交叉熵（cross-entropy）</strong>：衡量"猜得有多离谱"的数。猜得越准，loss 越低。</li>
+          <li><strong>困惑度（perplexity）</strong>：loss 取指数，可以直观理解成"平均每次是在几个候选里瞎猜"。比如困惑度 10 ≈ 每次在 10 个选项里蒙。</li>
+          <li><strong>AdamW</strong>：Adam（自适应学习率的优化器）+ W（Weight Decay，权重衰减，单独处理）。W 就是那个"weight decay"的意思。</li>
+        </ul>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">🎯</span>作用：这一步到底干了什么</h4>
+        <p>把一个"全是随机数、什么都不会"的模型，变成一个"懂语言、有知识、会推理"的基座模型。它是后面一切的地基。</p>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">⚙️</span>原理：它到底是怎么"学会"的</h4>
+        <p>就一句话：<strong>反复猜下一个字，猜错了就改。</strong></p>
+        <p>具体是：给它一段文本"今天天气真"，让它预测下一个字。它给出一堆候选字的概率，我们拿真实的"好"字去对比，算一个"交叉熵损失"——猜得越离谱，损失越大。然后用梯度下降（配合 AdamW）把参数往"让损失变小"的方向挪一点。这样重复几万亿次。</p>
+        <p>为什么"猜下一个字"这种简单任务能逼出智能？因为<strong>语言里藏着世界模型</strong>——要把"猫"后面接对，得知道猫是什么；要把一段物理推导接对，得会推理。所以逼它把下一个字猜准，等于逼它学会语言背后的知识。</p>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">💡</span>目的：图什么</h4>
+        <p>得到一个"压缩了海量知识"的基座模型——它其实已经把知识"背"进去了，只是还不会"好好回答问题"。</p>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">⚠️</span>注意事项：会踩的坑</h4>
+        <ul>
+          <li><strong>数据质量 &gt; 数据数量</strong>：喂一吨垃圾，只会练出会造垃圾的模型（garbage in, garbage out）。去重、过滤是重中之重。</li>
+          <li><strong>数据污染（data contamination）</strong>：如果测试题混进了训练集，模型等于"提前背了答案"，评估会虚高。必须仔细去重。</li>
+          <li><strong>scaling law 的边际递减</strong>：早期"越大越好"，但收益在变缓。现在不能只靠堆规模。</li>
+          <li><strong>成本极高</strong>：几万亿 token、成千上万张 GPU、好几个月、几千万美元。一旦训崩（比如中途出 bug），前功尽弃。</li>
+          <li><strong>重复数据</strong>：网上重复内容极多，不去重会浪费算力、还让模型死记。</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ========== 阶段二：SFT ========== -->
+    <div class="sec" id="sec2">
+      <div class="sub">
+        <h4><span class="ic">📜</span>发展历史：从"会续写"到"会回答"</h4>
+        <div class="tl">
+          <div class="ev"><span class="y">问题浮现</span><div class="d">GPT-3 很牛，但有个尴尬：你问它"1+1=？"，它不会答，只会顺着"续写"——因为它训练时从没学过"有人问问题、我要按答案回答"。</div></div>
+          <div class="ev"><span class="y">2021</span><div class="d"><strong>指令微调（instruction tuning）</strong> 的思想出现：把数据从"裸文本"换成"指令-回答对"，教模型"遵循指令"。</div></div>
+          <div class="ev"><span class="y">2022</span><div class="d"><strong>InstructGPT / FLAN</strong>：OpenAI 的 InstructGPT（ChatGPT 的前身）和谷歌的 FLAN，正式把"指令微调"发扬光大——这就是 SFT 的主流形态。</div></div>
+          <div class="ev"><span class="y">2022 之后</span><div class="d">SFT 成为标配：预训练完的模型，几乎都要过一遍 SFT，才变成"会对话"的助手。</div></div>
+        </div>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">🏷️</span>命名逻辑：这几个词到底啥意思</h4>
+        <ul>
+          <li><strong>监督（supervised）</strong>：有<strong>标准答案</strong>（理想的回答），模型照着答案学。相对于"无监督"（没答案）和"自监督"（答案=数据自己）。</li>
+          <li><strong>微调（fine-tune）</strong>：fine = 精细的。在<strong>已经预训练好</strong>的模型上做"细微"调整，不是推倒重来。就像给一台造好的机器"微调一下旋钮"。</li>
+          <li><strong>指令微调（instruction tuning）</strong>：SFT 的一种，特指数据是"（指令，回答）"对。tuning = 微调，instruction = 指令。</li>
+        </ul>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">🎯</span>作用：这一步到底干了什么</h4>
+        <p>把"只会续写"的基座模型，变成"你问、我答"的对话模型。它学到的不是新知识，而是<strong>新行为</strong>：遵循指令、按格式回答。</p>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">⚙️</span>原理：它到底是怎么"学会"的</h4>
+        <p>训练目标<strong>仍然是"猜下一个字"</strong>，但有两个关键改动：</p>
+        <ul>
+          <li><strong>数据换成问答对</strong>：套上固定格式（如 <code>&lt;用户&gt;问题&lt;助手&gt;回答</code>），让模型学会"看到问题后该接回答"。</li>
+          <li><strong>只对"回答部分"算损失</strong>：把"提问"那部分的损失 mask 掉（不参与梯度），只让模型在"回答部分"下功夫。这样它学的是"怎么答"，而不是浪费力气去"背题"。</li>
+        </ul>
+        <p>因为模型已经"懂"了（预训练学过知识），SFT 只需要<strong>很小步地改</strong>，就能把"续写"的习惯扳成"回答"的习惯。</p>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">💡</span>目的：图什么</h4>
+        <p>让模型对齐"人类期望的对话方式"——问什么答什么、格式规整、遵循指令。这是从"基座模型"到"能用的助手"的关键一跳。</p>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">⚠️</span>注意事项：会踩的坑</h4>
+        <ul>
+          <li><strong>灾难性遗忘（catastrophic forgetting）</strong>：SFT 训太猛，会把预训练学的知识冲掉（像为了练新本领，忘了老本行）。对策：<strong>小学习率、少轮数（通常 1~3 轮）</strong>。</li>
+          <li><strong>过拟合</strong>：轮数多了，模型会"背下答案"而不是"学会回答"，换新问题就露馅。所以不能训太久。</li>
+          <li><strong>数据质量</strong>：问答对的质量直接决定效果。垃圾问答 → 垃圾回答。</li>
+          <li><strong>数据多样性</strong>：要覆盖各种任务（问答、写作、翻译、代码、数学…），否则只会在某几类活上转。</li>
+          <li><strong>格式统一</strong>：不同来源的数据格式五花八门（有的用 markdown、有的带角色名），不一致会让模型困惑。</li>
+        </ul>
+      </div>
+      <div class="note good"><span class="tag">回到“先猜一猜”</span><p>答案是 <strong>B</strong>：基座模型其实"会"（知识都在），但它只会"续写"，没人教它"按答案回答"。SFT 就是来教这个的。</p></div>
+    </div>
+
+    <!-- ========== 阶段三：对齐 ========== -->
+    <div class="sec" id="sec3">
+      <div class="sub">
+        <h4><span class="ic">📜</span>发展历史：从"能答"到"答得让人舒服"</h4>
+        <div class="tl">
+          <div class="ev"><span class="y">2017</span><div class="d"><strong>Christiano 等人</strong>：最早提出"从人类偏好学奖励函数"——这是 RLHF 的思想源头。</div></div>
+          <div class="ev"><span class="y">2022</span><div class="d"><strong>InstructGPT / ChatGPT</strong>：把 RLHF 真正用在大模型上，一举成名——ChatGPT 之所以"不像机器"，靠的就是它。</div></div>
+          <div class="ev"><span class="y">2023</span><div class="d"><strong>DPO</strong>：斯坦福提出"直接偏好优化"，用一个巧妙的数学变换，<strong>省掉了"单独训奖励模型"这一步</strong>，训练更简单、更稳。</div></div>
+          <div class="ev"><span class="y">2024–2025</span><div class="d"><strong>GRPO、RLVR</strong> 等新方法：GRPO 省掉了另一个网络（critic），RLVR 用"数学对不对、代码能不能跑"这种<strong>客观对错</strong>代替人类偏好——把强化学习推向新高度。</div></div>
+        </div>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">🏷️</span>命名逻辑：这几个词到底啥意思</h4>
+        <ul>
+          <li><strong>RLHF = Reinforcement Learning from Human Feedback</strong>：逐词拆——Reinforcement Learning（强化学习：靠"奖励信号"学）+ from Human Feedback（奖励信号来自<strong>人类反馈</strong>，不是环境规则）。</li>
+          <li><strong>奖励模型（reward model，RM）</strong>：一个专门"给回答打分"的模型，扮演"自动裁判"。人类懒得一条条打分，就训个 RM 代劳。</li>
+          <li><strong>PPO = Proximal Policy Optimization</strong>：一种强化学习算法，核心是"<strong>每次别改太猛</strong>"（proximal = 近端的），防止模型一更新就跑飞。</li>
+          <li><strong>DPO = Direct Preference Optimization</strong>：Direct（直接的）= 跳过奖励模型、直接调模型；Preference（偏好）= 用的还是"人类偏好"数据；Optimization（优化）= 还是优化。</li>
+          <li><strong>GRPO</strong>：Group Relative Policy Optimization，核心是"一组回答互相比较"，省掉了 critic 网络。</li>
+          <li><strong>RLVR = RL with Verifiable Rewards</strong>：用"可验证的对错"（数学、代码）当奖励，而不是靠人类主观打分。</li>
+        </ul>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">🎯</span>作用：这一步到底干了什么</h4>
+        <p>让回答符合人类口味，做到"有用（Helpful）、诚实（Honest）、无害（Harmless）"——业界简称 <strong>HHH</strong>。让模型从"会答"变成"答得让人愿意用"。</p>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">⚙️</span>原理：它到底是怎么"学会"的</h4>
+        <p><strong>路线 A：RLHF（三步）</strong></p>
+        <ul>
+          <li>第 1 步，收集偏好数据：同一问题生成两个回答，请人挑"哪个更好"（只排序、不写标准答案，所以便宜）。</li>
+          <li>第 2 步，训奖励模型（RM）：让它学会"人觉得好的回答 = 高分"。底层是个叫 <strong>Bradley-Terry</strong> 的模型——专门描述"两者谁更强"的概率。</li>
+          <li>第 3 步，用 PPO 强化学习：拿 RM 当裁判，去调模型，让回答的"分数"越来越高；同时加一个 <strong>KL 约束</strong>，逼它别偏离原始模型太远（否则会崩坏、胡说）。</li>
+        </ul>
+        <p><strong>路线 B：DPO（一步）</strong></p>
+        <ul>
+          <li>DPO 发现一个数学事实：RLHF 那"奖励模型 + PPO"两步，其实可以<strong>合并成一个损失函数</strong>，直接用"偏好对"去调模型——让"好回答"的概率升高、"坏回答"的概率降低。不用训 RM，不用跑强化学习，一步到位。</li>
+        </ul>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">💡</span>目的：图什么</h4>
+        <p>安全、听话、符合价值观——让模型不只"有能力"，还"不会乱来"（不胡说、不冒犯、不教人做坏事）。</p>
+      </div>
+
+      <div class="sub">
+        <h4><span class="ic">⚠️</span>注意事项：会踩的坑</h4>
+        <ul>
+          <li><strong>奖励攻击（reward hacking）</strong>：模型会钻奖励模型的空子——比如发现"说得越长、越讨好，分越高"，就学会说一堆正确但没用的废话。奖励模型本身有缺陷，模型就会利用它。</li>
+          <li><strong>过度对齐</strong>：对齐太狠，模型变得"谄媚"（一味顺着你说）或"过度拒绝"（正常问题也拒答）。</li>
+          <li><strong>对齐税（alignment tax）</strong>：对齐过程可能让模型"变笨一点"（为了安全牺牲了部分能力）。</li>
+          <li><strong>偏好数据的偏差</strong>：不同标注者口味不同、文化不同，偏好本身就有噪声。</li>
+          <li><strong>KL 约束不能丢</strong>：不放 KL 约束，PPO 容易把模型改崩（让它"为了刷分而乱说"）。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>这次题更难一点，考"理解"不考"背"。<strong>5 道全对，这节加餐才算吃透</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>为什么"预训练"叫"预"训练？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>因为它在正式任务（微调）之前做，pre- 是"之前"的意思</span></div><div class="opt" data-a="B"><span class="k">B</span><span>因为它是"预备实验"</span></div><div class="opt" data-a="C"><span class="k">C</span><span>因为只有它需要训练</span></div><div class="opt" data-a="D"><span class="k">D</span><span>随便取的名字</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。pre-training 的 pre- = "在……之前"，指在微调之前先做的训练。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>SFT 为什么"只对回答部分算损失"？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>让模型专心学"怎么答"，不浪费力气背"提问"</span></div><div class="opt" data-a="B"><span class="k">B</span><span>因为回答比提问重要</span></div><div class="opt" data-a="C"><span class="k">C</span><span>为了省一半算力</span></div><div class="opt" data-a="D"><span class="k">D</span><span>没有原因</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。把 prompt 部分的损失 mask 掉，梯度只指导"如何生成好回答"。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：SFT 是从零开始重新训练一个新模型。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。SFT 是"接着预训练的模型继续调"，且小学习率、少轮数——不是从零开始。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>DPO 比 RLHF 省掉了什么？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>省掉"单独训奖励模型 + 跑强化学习"，直接调模型</span></div><div class="opt" data-a="B"><span class="k">B</span><span>省掉数据收集</span></div><div class="opt" data-a="C"><span class="k">C</span><span>省掉模型本身</span></div><div class="opt" data-a="D"><span class="k">D</span><span>什么都没省</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。DPO 用数学把 RM + PPO 合并成一个损失，直接用偏好对调模型。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】模型为了拿高分，学会"说一堆正确但没用的废话"——这叫什么问题？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>奖励攻击（reward hacking）——钻奖励模型的空子</span></div><div class="opt" data-a="B"><span class="k">B</span><span>过拟合</span></div><div class="opt" data-a="C"><span class="k">C</span><span>灾难性遗忘</span></div><div class="opt" data-a="D"><span class="k">D</span><span>数据污染</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。reward hacking：模型发现"讨奖励模型欢心"的捷径，而不是真正变好——这是对齐阶段最大的坑。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一节，带走三句话</b>
+      <ol>
+        <li><strong>预训练</strong>（学知识，自监督，最贵）→ <strong>SFT</strong>（学回答，要问答对，防遗忘）→ <strong>对齐</strong>（学做人，RLHF/DPO，防奖励攻击）。</li>
+        <li>命名都藏着逻辑：pre- = 之前、supervised = 有标准答案、fine-tune = 精细调整、DPO 的 Direct = 跳过奖励模型。</li>
+        <li>最大的坑：预训练怕"数据污染"，SFT 怕"灾难性遗忘"，对齐怕"奖励攻击"。</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · 番外 · 大模型训练三阶段：深度详解</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='b'
+      ? '<strong>猜对了！</strong>基座模型知识都有，只是只会"续写"、没人教它"按答案回答"——SFT 就是来教这个的。'
+      : '<strong>你选了"知识是假的"。</strong>其实知识是真的在——它只是行为习惯不对（只会续写）。SFT 会扳正这个习惯。';
+  }));
+
+  $$('#tabs button').forEach(b=>b.addEventListener('click',()=>{
+    const t=b.dataset.t;
+    $$('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+    ['1','2','3'].forEach(i=>$('#sec'+i).classList.toggle('on',i===t));
+  }));
+
+  const CORRECT={'1':'A','2':'A','3':'F','4':'A','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！这节加餐吃透了</h3><p>5 道全对。你已经把三阶段的历史、命名、原理、坑都吃透了。</p>`;$('#quizResult').className='result show pass';$('#quizStatus').textContent='5 / 5 全对';}
+    else{h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E1 · 多头注意力 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0}.seg button+button{border-left:1px solid var(--rule-strong)}.seg button.on{background:var(--ink);color:#fff}.seg button.on:hover{color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .matgrid{display:inline-grid;gap:5px}
+  .matgrid .mc{width:44px;height:36px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;border:1px solid var(--rule);border-radius:6px;background:#fff}
+  .matgrid .mc.tag{background:transparent;border:none;color:var(--ink-faint);font-size:10.5px;font-family:var(--sans)}
+  .headpanel{background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:16px}
+  .headpanel h4{margin:0 0 10px;font-family:var(--mono);font-size:12.5px}
+  .headpanel p{margin:0;font-size:14px;color:var(--ink-soft)}
+  .all{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
+  .all .h{flex:1;min-width:200px}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">E1 · 多头注意力</span><span><a href="课程-D5-完整公式.html">← 回 D5</a> 　·　 第 14 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>D 段你会“一套注意力”了。这关让它变强：<strong>同时用好几套，从多个角度看关系</strong>。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 E · 让它变强 · 第 1 关</p>
+    <h1>多头注意力：<br>同时戴好几副眼镜看</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>D 段你会算“一套注意力”了。但一句话里的关系不止一种：有的看<strong>语法</strong>（主语↔动词）、有的看<strong>指代</strong>（它↔小猫）、有的看<strong>语义搭配</strong>。一套注意力只能看一种角度。这关学<strong>多头</strong>：同时用好几套 QKV，各看各的，最后拼起来。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>一句话里，既有“主语和动词”的关系，又有“它指代小猫”的关系。用<strong>一套</strong>注意力，能同时看清这好几种关系吗？</p>
+    <div class="guess">
+      <button data-g="yes">能，一套就够了</button>
+      <button data-g="no">难，得几套各看各的</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">一套注意力，只有一套 QKV，只能学出“一种”关注方式。</p>
+    <p>但语言的关系是<strong>多样</strong>的。比如“<strong>小猫 追 老鼠，因为 它 饿</strong>”里，至少有三类关系：语法（谁追谁）、指代（它=小猫）、语义（饿和猫搭配）。一套注意力很难同时把三类都照顾到。</p>
+    <p>解决办法很简单：<span class="hl">多做几套注意力，各自用自己的一套 QKV，各看各的角度，最后拼起来。</span>每一套叫一个“<strong>头</strong>”（head），合起来就是“<strong>多头注意力</strong>”。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>难，得几套各看各的</strong>”。一套注意力只有一种视角，多头就是“多副眼镜，各看各的”。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p>多头注意力 = <strong>好几套 QKV 并行，各自从一个角度看关系，最后把结果拼起来</strong>。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 多头不是“更贵”。</strong>把 512 维<strong>切</strong>成 8 个 64 维，各自做注意力，总计算量和做一次 512 维注意力差不多。是同价换多视角。</p>
+      <p><strong>② 每个头是独立并行的</strong>，互不干扰，各用各的 QKV 矩阵。</p>
+      <p><strong>③ 每个头的维度 = d_model ÷ 头数。</strong>论文里 512 ÷ 8 = 64，所以每头在 64 维的子空间里看。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>做法分三步：</p>
+    <ul>
+      <li><strong>切。</strong>把每个词的 512 维向量，切成 8 段（每段 64 维）。</li>
+      <li><strong>各算各。</strong>8 个头各自用自己的一套 QKV 矩阵，各算一次注意力（就是 D5 那套流程）。</li>
+      <li><strong>拼。</strong>把 8 个头的结果首尾接回 512 维，再乘一个融合矩阵。</li>
+    </ul>
+    <p>写出来：每个头 <code>headᵢ = attention(Q Wᵢ^Q, K Wᵢ^K, V Wᵢ^V)</code>，最后 <code>MultiHead = 拼接(head₁…head₈) · W^O</code>。</p>
+    <div class="note"><span class="tag">跟着走一遍（论文数字）</span>
+      <p>d_model = <strong>512</strong>，头数 h = <strong>8</strong>，所以每头维度 = 512 ÷ 8 = <strong>64</strong>。<br>
+      8 个头各算一次 64 维的注意力，最后拼回 512 维。总计算量 ≈ 做一次 512 维注意力——<strong>同价，但多了 8 个视角。</strong></p>
+    </div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p>句子“<strong>小猫 追 老鼠 因为 它 饿</strong>”。<strong>先猜</strong>：哪个头会负责“把‘它’连回‘小猫’”？猜完再点。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 三个头，各看各的</span>
+        <span class="seg" id="heads"><button data-h="0" class="on">头 1</button><button data-h="1">头 2</button><button data-h="2">头 3</button><button data-h="3">看全部</button></span>
+      </div>
+      <div class="card-b" id="stage"></div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 依次点头 1、头 2、头 3，看每个头“关注”的重点。<br>2. 点“看全部”，一眼看出三个头的分工。<br>3. 想一想：要是只有头 1（只盯相邻词），“它”还找得到“小猫”吗？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">只有“头 1”（盯相邻词）的话，“它”和“小猫”隔得远，就找不到了。正因如此才需要“头 2”专门去连指代关系。多头 = 各头分工，合起来才全面。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>为什么要用多头注意力？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>一套注意力只能看一种角度，多头能同时从多个角度看关系</span></div><div class="opt" data-a="B"><span class="k">B</span><span>让模型跑得更快</span></div><div class="opt" data-a="C"><span class="k">C</span><span>让模型更省内存</span></div><div class="opt" data-a="D"><span class="k">D</span><span>纯粹为了好看</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。一句话有多种关系（语法/指代/语义），一套注意力只有一种视角，多头让多个头各看一种。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>论文 d_model=512、头数 h=8，每个头的维度是多少？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>512</span></div><div class="opt" data-a="B"><span class="k">B</span><span>64</span></div><div class="opt" data-a="C"><span class="k">C</span><span>8</span></div><div class="opt" data-a="D"><span class="k">D</span><span>2048</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B · 64</strong>。512 ÷ 8 = 64。每个头在 64 维的子空间里算注意力。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：多头注意力比单头“贵得多”，因为要算 8 次完整的注意力。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。512 维切成 8 个 64 维，各算一次，总计算量 ≈ 做一次 512 维注意力。是同价换多视角。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>判断：8 个头是先后顺序算的，一个算完下一个才接着。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。8 个头是<strong>并行独立</strong>的，同时算，互不依赖。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】多头算完 8 个头的结果后，最后做什么？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>把它们拼接起来，再乘一个融合矩阵</span></div><div class="opt" data-a="B"><span class="k">B</span><span>只留分数最高的那个头</span></div><div class="opt" data-a="C"><span class="k">C</span><span>把 8 个头的结果加起来除以 8</span></div><div class="opt" data-a="D"><span class="k">D</span><span>随便挑一个用</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。8 个头的结果首尾拼接回 512 维，再乘一个 W^O 融合。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>多头 = <strong>好几套 QKV 并行，各看一个角度，最后拼接融合</strong>。</li>
+        <li>每个头维度 = d_model ÷ 头数（512÷8=64）；<strong>总计算量和单头差不多</strong>。</li>
+        <li>一句话有多种关系，多头让每个头“分工”各看一种。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-E2-位置编码.html">✅ 过关，进入下一关：E2 · 位置编码 →</a>
+      <div class="pending">如果点不动（比如在预览小窗里）——E2 还没生成——回一句"<b>开 E2</b>"，我就把它做出来；也可以 <a href="课程-D5-完整公式.html" style="color:var(--violet)">回 D5 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · E1 · 多头注意力</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='no'
+      ? '<strong>猜对了！</strong>一套注意力只有一种视角，多种关系得靠多头各看各的。'
+      : '<strong>你选了“一套就够”。</strong>其实很难——一套 QKV 只能学出一种关注方式。';
+  }));
+
+  const TOKENS=['小猫','追','老鼠','因为','它','饿'];
+  const n=TOKENS.length;
+  // 三个头的注意力权重（示意）
+  const HEADS=[
+    {name:'头 1 · 看邻近',desc:'主要盯相邻的词，抓局部搭配（如“追→老鼠”）。',
+     M:[[0.5,0.4,0.1,0,0,0],[0.3,0.5,0.2,0,0,0],[0.1,0.4,0.5,0,0,0],[0,0,0,0.6,0.2,0.2],[0,0,0,0.2,0.6,0.2],[0,0,0,0.2,0.2,0.6]]},
+    {name:'头 2 · 看指代',desc:'把“它”连回“小猫”，把“饿”也连回“小猫”。',
+     M:[[0.3,0,0,0,0.5,0.2],[0.3,0.4,0.3,0,0,0],[0.2,0.3,0.3,0,0.2,0],[0,0,0,0.4,0.3,0.3],[0.7,0,0,0,0.2,0.1],[0.6,0,0,0,0.1,0.3]]},
+    {name:'头 3 · 看全局',desc:'几乎平均地看所有词，起“汇总全句”的作用。',
+     M:[[0.17,0.17,0.17,0.16,0.17,0.16],[0.17,0.17,0.17,0.16,0.17,0.16],[0.17,0.17,0.17,0.16,0.17,0.16],[0.17,0.17,0.17,0.16,0.17,0.16],[0.17,0.17,0.17,0.16,0.17,0.16],[0.17,0.17,0.17,0.16,0.17,0.16]]}
+  ];
+  function cellColor(v){const t=Math.min(v/0.7,1);const r=Math.round(240-40*t),g=Math.round(247-120*t),b=Math.round(250-120*t);return `rgb(${r},${g},${b})`;}
+  function ink(v){return v>0.4?'#fff':'#0E1A32';}
+  function heat(M){
+    let h='<div class="matgrid" style="grid-template-columns:46px repeat('+n+',44px)">';
+    h+='<div class="mc tag"></div>'+TOKENS.map(t=>`<div class="mc tag">${t}</div>`).join('');
+    for(let i=0;i<n;i++){
+      h+=`<div class="mc tag">${TOKENS[i]}</div>`;
+      for(let j=0;j<n;j++){h+=`<div class="mc" style="background:${cellColor(M[i][j])};color:${ink(M[i][j])}">${M[i][j].toFixed(2)}</div>`;}
+    }
+    return h+'</div>';
+  }
+  function panel(hd){return `<div class="headpanel"><h4>${hd.name}</h4>${heat(hd.M)}<p style="margin-top:10px">${hd.desc}</p></div>`;}
+  let cur=0,all=false;
+  function render(){
+    $$('#heads button').forEach(b=>b.classList.toggle('on',(b.dataset.h==='3'&&all)||(+b.dataset.h===cur&&!all)));
+    if(all){
+      $('#stage').innerHTML='<div class="all">'+HEADS.map(h=>`<div class="h">${panel(h)}</div>`).join('')+'</div>';
+    }else{
+      $('#stage').innerHTML=panel(HEADS[cur]);
+    }
+  }
+  $$('#heads button').forEach(b=>b.addEventListener('click',()=>{const h=+b.dataset.h;if(h===3){all=!all;}else{cur=h;all=false;}render();}));
+  render();
+
+  const CORRECT={'1':'A','2':'B','3':'F','4':'F','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经懂：<strong>多头 = 好几套 QKV 并行各看一个角度、最后拼接融合；每头 64 维；同价换多视角</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

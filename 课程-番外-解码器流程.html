@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番外 · 解码器大模型怎么一个字一个字写出来</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(26px,5.2vw,40px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .tokens{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-height:48px;padding:12px;background:#FBFCFE;border:1px solid var(--rule);border-radius:10px;margin-bottom:14px}
+  .tok{border:1px solid var(--rule-strong);border-radius:7px;padding:5px 11px;font-size:14px;background:#fff}
+  .tok.new{background:rgba(226,62,87,.1);border-color:var(--signal);color:var(--signal);font-weight:700;animation:pop .25s}
+  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  .bars{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+  .bar-row{display:grid;grid-template-columns:44px 1fr 52px;gap:10px;align-items:center}
+  .bar-row .k{font-family:var(--mono);font-size:12px;color:var(--ink-soft);text-align:right}
+  .bar-track{display:block;height:16px;background:rgba(14,26,50,.06);border-radius:5px;overflow:hidden}
+  .bar-fill{display:block;height:100%;border-radius:5px;transition:width .2s;background:var(--violet)}
+  .bar-fill.pick{background:var(--signal)}
+  .bar-row .pc{font-family:var(--mono);font-size:12px;text-align:right}
+  .flow{display:flex;flex-direction:column;gap:6px;max-width:460px;margin:0 auto 6px}
+  .fstep{border:1px solid var(--rule-strong);border-radius:9px;padding:8px 14px;text-align:center;font-size:13.5px;background:#FBFCFE}
+  .fstep.att{background:rgba(108,92,231,.08);border-color:var(--violet)}
+  .fstep.ffn{background:rgba(242,178,62,.12);border-color:#D9A02E}
+  .fstep.out{background:rgba(226,62,87,.08);border-color:var(--signal)}
+  .fstep.norm{font-family:var(--mono);font-size:12px;color:var(--ink-soft);border-style:dashed}
+  .farrow{text-align:center;color:var(--ink-faint);font-family:var(--mono);font-size:13px}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">番外 · 解码器流程</span><span><a href="课程-G2-综合自测.html">← 回 G2</a> 　·　 加餐课 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>这是整机<strong>右侧的解码器</strong>放大看——现在主流大模型（GPT/Claude 那类）用的就是它。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">番外 · 加餐课</p>
+    <h1>解码器大模型：<br>怎么一个字一个字写出来</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>GPT、Claude 这类大模型，都是“只用解码器”的。它们回答你时，不是一次性想好整段，而是<strong>一个字一个字往外蹦</strong>。这关把“蹦出一个字”的完整流程讲清——从“已写的词”到“下一个词怎么被挑出来”。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>ChatGPT 回答你时，是<strong>先在脑子里想好整段话，再一口气打出来</strong>，还是<strong>一个字一个字现想现写</strong>？</p>
+    <div class="guess">
+      <button data-g="whole">先想好整段，再一口气输出</button>
+      <button data-g="one">一个字一个字现想现写</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。回想一下：你是不是看到过它像“打字”一样往外冒字？）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">答案藏在你的使用体验里。</p>
+    <p>你用 ChatGPT，是不是看到答案像<strong>打字</strong>一样，一个字一个字往外冒？这不是故意做效果——它<strong>真的就是一次只生成一个字</strong>。</p>
+    <p>这种“每次只写下一个字、写出来再接上”的做法，叫<span class="hl">自回归生成</span>。整个过程像玩<strong>接龙</strong>：给个开头，它接一个字，把这个字拼进去，再接着接下一个字，一直接到“写完”为止。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>一个字一个字现想现写</strong>”。它没有“先想好整段”，而是边写边想下一个字。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p>大模型写答案 = <strong>接龙</strong>：每次只预测“下一个字”，写出来，再预测“下下一个字”，一直写下去。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① decoder-only 大模型没有“交叉注意力”。</strong>因为它根本没有编码器，就没东西可“交叉”。它的每一层只有“掩码自注意力 + FFN”。</p>
+      <p><strong>② 为什么每次回答不一样？</strong>最后一步不是“死选概率最高的词”，而是“按概率抽”。抽的时候有随机性，所以同一个问题两次答案可能不同（温度调得越高越随机）。</p>
+      <p><strong>③ 每写一个字，都要把“已写的所有字”重新算一遍。</strong>这是它慢的原因之一（细节可以不管）。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>分两层看：外面是“一个字一个字”的大循环，里面是“每写一个字”的内部流程。</p>
+
+    <p><strong>外面的大循环（自回归）：</strong></p>
+    <ul>
+      <li>手上已有：一堆“已写出来的字”。</li>
+      <li>机器算一算，预测出<strong>下一个字</strong>。</li>
+      <li>把这个字接到后面。</li>
+      <li>重复，直到输出“结束”标记，或达到最大长度。</li>
+    </ul>
+
+    <p><strong>里面“每写一个字”的内部流程（5 步）：</strong></p>
+    <div class="flow">
+      <div class="fstep">① 把已写的每个字 → 变成向量 + 加位置编码</div>
+      <div class="farrow">↓</div>
+      <div class="fstep att">② 过 N 层（每层 = 掩码自注意力 + FFN，各带残差+Norm）</div>
+      <div class="farrow">↓</div>
+      <div class="fstep">③ 只取“最后一个位置”的向量（因为它要预测下一个字）</div>
+      <div class="farrow">↓</div>
+      <div class="fstep out">④ 线性层 + softmax → 词表里每个字一个概率</div>
+      <div class="farrow">↓</div>
+      <div class="fstep out">⑤ 按概率挑一个字（采样）→ 就是下一个字</div>
+    </div>
+
+    <div class="note"><span class="tag">为什么“只看已写的字”就行</span>
+      <p>靠的是<strong>因果掩码</strong>（F2 学过）：每个字只能看自己及左边，右边的“未来字”全被挡住。所以它只能根据“已写的”来预测下一个，不会作弊。</p>
+    </div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：给个开头“我”，机器会怎么一个字一个字接下去？点“生成下一个字”看全过程。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 接龙：一次只写一个字</span><span id="stepTag">准备就绪</span></div>
+      <div class="card-b">
+        <div class="tokens" id="tokens"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="primary" id="next">生成下一个字 →</button>
+          <button id="reset">重置</button>
+        </div>
+        <p class="cap" style="text-align:left;font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:10px">下面显示“这一步，机器认为各候选字的概率”。红条是它这次挑中的。</p>
+        <div class="bars" id="bars"></div>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 连点几次“生成下一个字”，看句子一个字一个字变长。<br>2. 每次盯着候选概率条——机器是“挑概率最高的”吗？（不是，是按概率抽，只是概率高的更常被抽中。）<br>3. 接完了，回想一下：整个过程是不是“每次只写一个字”？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">这就是“自回归”：每次只根据“已写的字”预测下一个字，写出来，再接下一个。ChatGPT 冒字慢，就是因为它在真·一个字一个字地写。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，这节加餐就算吃下了</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>“自回归生成”是什么意思？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>每次只预测下一个字，写出来，再预测下下一个</span></div><div class="opt" data-a="B"><span class="k">B</span><span>一次想好整段再输出</span></div><div class="opt" data-a="C"><span class="k">C</span><span>从后往前倒着写</span></div><div class="opt" data-a="D"><span class="k">D</span><span>把整段同时算出来</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。自回归 = 一次只写一个字，写出来再接下一个，像接龙。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>decoder-only 大模型（如 GPT）有没有“交叉注意力”？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>没有——它没有编码器，就没东西可交叉</span></div><div class="opt" data-a="B"><span class="k">B</span><span>有，和翻译模型一样</span></div><div class="opt" data-a="C"><span class="k">C</span><span>有，但只在第一层</span></div><div class="opt" data-a="D"><span class="k">D</span><span>不确定</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。decoder-only 只有“掩码自注意力 + FFN”，没有交叉注意力。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：预测下一个字时，模型可以偷看后面的字。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。因果掩码把“未来字”全挡住，只能看已写的。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>为什么同一个问题，ChatGPT 两次回答可能不一样？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>最后是“按概率抽词”，有随机性，不是死选最高</span></div><div class="opt" data-a="B"><span class="k">B</span><span>它故意气你</span></div><div class="opt" data-a="C"><span class="k">C</span><span>它记性不好</span></div><div class="opt" data-a="D"><span class="k">D</span><span>服务器每次随机换模型</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。采样有随机性：概率高的更常被抽中，但不是每次必中。温度越高越随机。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】内部流程里，最后一步“softmax 得到词表每个词的概率”之后，接着做什么？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>按概率挑一个字，接上去</span></div><div class="opt" data-a="B"><span class="k">B</span><span>把整句翻译成英文</span></div><div class="opt" data-a="C"><span class="k">C</span><span>清空重来</span></div><div class="opt" data-a="D"><span class="k">D</span><span>结束进程</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。softmax 出概率后，按概率采样挑一个词，接到句尾，循环继续。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一节，带走三句话</b>
+      <ol>
+        <li>大模型写答案 = <strong>自回归接龙</strong>：一次只写一个字。</li>
+        <li>每写一个字，内部是：<strong>变向量 → 过 N 层（掩码自注意力+FFN）→ 取最后一个 → softmax 出概率 → 采样挑词</strong>。</li>
+        <li>decoder-only <strong>没有交叉注意力</strong>；每次答案不同是因为“按概率抽”，有随机性。</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · 番外 · 解码器大模型怎么一个字一个字写出来</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='one'
+      ? '<strong>猜对了！</strong>它就是一次只写一个字——所以你能看到它像打字一样往外冒。'
+      : '<strong>你选了“先想好整段”。</strong>其实不是——它是边写边想下一个字（自回归）。';
+  }));
+
+  /* 接龙演示：预置一条生成路径，每步给候选概率 */
+  const PATH=[
+    {next:'爱', cands:[['爱',0.42],['想',0.28],['是',0.18],['吃',0.12]]},
+    {next:'学习', cands:[['学习',0.55],['打游戏',0.22],['睡觉',0.13],['工作',0.10]]},
+    {next:'AI', cands:[['AI',0.61],['数学',0.17],['英语',0.14],['代码',0.08]]},
+    {next:'。', cands:[['。',0.70],['，',0.18],['！',0.12]]},
+    {next:'〈完〉', cands:[['〈完〉',1.0]]}
+  ];
+  let step=0, done=false;
+  function render(){
+    const words=['我'].concat(PATH.slice(0,step).map(p=>p.next));
+    $('#tokens').innerHTML=words.map((w,i)=>`<span class="tok ${i===words.length-1&&step>0&&!done?'new':''}">${w}</span>`).join('');
+    if(done){
+      $('#stepTag').textContent='写完了 ✓';
+      $('#bars').innerHTML='';
+      $('#next').disabled=true;
+      return;
+    }
+    $('#stepTag').textContent=`第 ${step+1} 步 · 预测第 ${words.length+1} 个字`;
+    const c=PATH[step].cands;
+    const picked=PATH[step].next;
+    $('#bars').innerHTML=c.map(([w,p])=>`<div class="bar-row"><span class="k">${w}</span><span class="bar-track"><span class="bar-fill ${w===picked?'pick':''}" style="width:${(p*100).toFixed(0)}%"></span></span><span class="pc">${(p*100).toFixed(0)}%</span></div>`).join('');
+    $('#next').disabled=false;
+  }
+  $('#next').addEventListener('click',()=>{
+    if(done)return;
+    step++;
+    if(step>=PATH.length){done=true;}
+    render();
+  });
+  $('#reset').addEventListener('click',()=>{step=0;done=false;render();});
+  render();
+
+  const CORRECT={'1':'A','2':'A','3':'F','4':'A','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！这节加餐吃下了</h3><p>5 道全对。你已经懂：<strong>大模型 = 自回归接龙，一次写一个字；内部是变向量→过N层→取最后→softmax→采样</strong>。</p>`;$('#quizResult').className='result show pass';$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink')&&$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

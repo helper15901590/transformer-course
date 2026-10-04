@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D4 · 缩放 ÷√dₖ —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:var(--rule-strong);outline:none;margin:9px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff}
+  .dkrow{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;margin-bottom:16px}
+  .dkrow .lab{font-family:var(--mono);font-size:13px;color:var(--ink-soft)}
+  .dkrow .val{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--signal)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px}@media(max-width:620px){.two{grid-template-columns:1fr}}
+  .two h4{margin:0 0 10px;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft)}
+  .bars{display:flex;flex-direction:column;gap:8px}
+  .bar-row{display:grid;grid-template-columns:44px 1fr 56px;gap:10px;align-items:center}
+  .bar-row .k{font-family:var(--mono);font-size:12px;color:var(--ink-soft);text-align:right}
+  .bar-track{display:block;height:18px;background:rgba(14,26,50,.06);border-radius:5px;overflow:hidden}
+  .bar-fill{display:block;height:100%;border-radius:5px;transition:width .2s}
+  .bar-row .pc{font-family:var(--mono);font-size:12px;text-align:right}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">D4 · 缩放 ÷√dₖ</span><span><a href="课程-D3-打分.html">← 回 D3</a> 　·　 第 12 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>把 D3 的分数<strong>稳住</strong>——除以 √dₖ，防止 softmax 被极端分数“带偏”。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 D · 注意力的计算 · 第 4 关</p>
+    <h1>缩放：为什么除以 √dₖ</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>D3 算出分数表了。但这些分数<strong>随维度变大而“大起大落”</strong>——维度越高，点积越容易出极端值。这关讲清：为什么要除以 <code>√dₖ</code> 把分数拉回正常范围。这正是 A2 里埋下的伏笔。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>点积 = 很多个数两两相乘再相加。那<strong>维度越高</strong>（相加的数越多），点积出来的分数会怎样？</p>
+    <div class="guess">
+      <button data-g="flat">越来越平均、挤在一起</button>
+      <button data-g="wild">越来越“大起大落”、容易出极端值</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">先看一个事实。</p>
+    <p>点积是把<strong>很多个数</strong>两两相乘再加起来。维度越高，相加的项就越多，总和就<strong>越容易变得很大、很极端</strong>。而后面 softmax 最怕极端分数——一极端，它的输出就“押死”（差不多一个 1、其余 0），梯度也没了，模型学不动。</p>
+    <p>那怎么办？<span class="hl">把点积分数的“幅度”压回正常范围</span>——除以一个和维度有关的数 <code>√dₖ</code>。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>越来越极端</strong>”。维度越高，点积越容易大起大落。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p>分数随维度变大而“失控”，<strong>除以 √dₖ 把它拉回正常范围</strong>——这样 softmax 才不会“押死”。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 缩放不改变“谁更像谁”。</strong>它只是把所有分数一起缩小，谁大谁小的顺序不变。</p>
+      <p><strong>② 是除以 √dₖ，不是除以 dₖ。</strong>因为分数“幅度”和 √dₖ 成正比（不是 dₖ），所以除 √dₖ 才对。</p>
+      <p><strong>③ 缩放是为了“训练稳、梯度不消失”，不是为了“让答案更准”。</strong>它是给机器调数值用的。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>为什么偏偏是 <strong>√dₖ</strong>？因为有个规律：<strong>点积分数的“波动幅度”（标准差）正好和 √dₖ 成正比</strong>。</p>
+    <p>这么想：如果 Q 和 K 里每个数都差不多大（平均是 1 上下），那点积就是 dₖ 个数相加。dₖ 越大，加的数越多，和就越大、越容易跑远。算下来，这个“越跑越远”的程度，正好和 <span class="hl">√dₖ</span> 成正比。</p>
+    <p>所以把分数 <strong>÷ √dₖ</strong>，就把“波动幅度”拉回固定的大小——不管维度是多少，分数都落在舒服的范围里。</p>
+    <div class="note"><span class="tag">跟着走一遍（为什么不是 ÷dₖ）</span>
+      <p>举个直觉：dₖ = 4 时，点积是 4 个数相加，波动约 √4 = <strong>2</strong> 倍；dₖ = 100 时，波动约 √100 = <strong>10</strong> 倍。所以维度和“波动”之间是<strong>开根号</strong>的关系，除的是 √dₖ，不是 dₖ。<br>（严格讲这是“方差/标准差”的事，但直觉上记住“开根号”就够。）</p>
+    </div>
+    <p>公式里写出来，就是中间多一步 <code>÷ √dₖ</code>：</p>
+    <p style="text-align:center;font-family:var(--mono);font-size:15px;margin:1.1em 0">分数 = QKᵀ <span class="hl">÷ √dₖ</span></p>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p>下面有 4 个词。左边“不缩放”、右边“缩放”。<strong>先猜</strong>：把维度 dₖ 拉大，左边会不会越来越“押在一个词上”？猜完再拖。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 不缩放 vs 缩放</span></div>
+      <div class="card-b">
+        <div class="dkrow">
+          <span class="lab">维度 dₖ = <span class="val" id="dkval">8</span>（√dₖ ≈ <span id="sqrtval">2.8</span>）</span>
+          <input type="range" id="dk" min="1" max="256" value="8" step="1" style="max-width:280px">
+        </div>
+        <div class="two">
+          <div>
+            <h4>❌ 不缩放：softmax(QKᵀ)</h4>
+            <div class="bars" id="unscaled"></div>
+          </div>
+          <div>
+            <h4>✅ 缩放：softmax(QKᵀ / √dₖ)</h4>
+            <div class="bars" id="scaled"></div>
+          </div>
+        </div>
+        <p class="cap" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:14px;text-align:center">四个词的“真实相似度”不变；变的只是维度。看左边的分布怎么越来越“尖”。</p>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 把 dₖ 拖到最小（1），看左右两边的分布。<br>2. 慢慢拖到最大（256），盯着左边——它是不是越来越“押在一个词上”（别的几乎 0）？<br>3. 再看右边：不管 dₖ 多大，它是不是<strong>几乎不变</strong>？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">左边（不缩放）随维度变大越来越“押死”——softmax 一极端，梯度就没了。右边（缩放）始终温和，因为 ÷√dₖ 把维度的影响抵消掉了。这就是缩放的全部意义。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>维度越高，点积出来的分数会怎样？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>越来越平均、挤在一起</span></div><div class="opt" data-a="B"><span class="k">B</span><span>越来越“大起大落”、容易出极端值</span></div><div class="opt" data-a="C"><span class="k">C</span><span>保持不变</span></div><div class="opt" data-a="D"><span class="k">D</span><span>越来越接近 0</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B</strong>。加的数越多，和越容易跑远，越容易出极端值。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>缩放除的是下面哪个？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>dₖ</span></div><div class="opt" data-a="B"><span class="k">B</span><span>√dₖ</span></div><div class="opt" data-a="C"><span class="k">C</span><span>dₖ²</span></div><div class="opt" data-a="D"><span class="k">D</span><span>2</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B · √dₖ</strong>。分数的“波动”和 √dₖ 成正比，所以除 √dₖ 才拉得回。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：缩放会改变“谁更像谁”的顺序。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。缩放只是把所有分数一起缩小，谁大谁小的顺序不变。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>如果<strong>不缩放</strong>，维度很大时会出什么毛病？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>softmax 会“押死”（一个接近 1、其余接近 0），梯度消失，学不动</span></div><div class="opt" data-a="B"><span class="k">B</span><span>分数会变成负数</span></div><div class="opt" data-a="C"><span class="k">C</span><span>结果更准确</span></div><div class="opt" data-a="D"><span class="k">D</span><span>没有任何影响</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。分数太极端 → softmax 饱和 → 梯度消失 → 训练停滞。缩放正是为了防止这个。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】dₖ = 64 时，缩放应该除以多少？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>64</span></div><div class="opt" data-a="B"><span class="k">B</span><span>8</span></div><div class="opt" data-a="C"><span class="k">C</span><span>4096</span></div><div class="opt" data-a="D"><span class="k">D</span><span>6.4</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B · 8</strong>。√64 = 8。论文里 dₖ = 64，所以每步都除 8。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>维度越高，点积分数越“大起大落”。</li>
+        <li>除以 <strong>√dₖ</strong>，把分数的“波动幅度”拉回正常范围（和 √dₖ 成正比，不是 dₖ）。</li>
+        <li>缩放是为了<strong>训练稳、梯度不消失</strong>，不改变“谁更像谁”。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-D5-完整公式.html">✅ 过关，进入下一关：D5 · 完整公式走一遍 →</a>
+      <div class="pending">如果点不动（比如在预览小窗里）——D5 还没生成——回一句"<b>开 D5</b>"，我就把它做出来；也可以 <a href="课程-D3-打分.html" style="color:var(--violet)">回 D3 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · D4 · 缩放 ÷√dₖ</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='wild'
+      ? '<strong>猜对了！</strong>维度越高，点积越容易大起大落。所以后面要缩放。'
+      : '<strong>你选了“越来越平均”。</strong>其实相反——加的数越多，和越容易跑远、越极端。';
+  }));
+
+  /* 4 个词的“真实相似度”（相对差距固定，与维度无关） */
+  const NAMES=['①','②','③','④'];
+  const BASE=[1.8,0.9,0.4,-0.3];
+  const COLORS=['#E23E57','#6C5CE7','#0E9AA7','#F2B23E'];
+  function softmax(arr){const m=Math.max.apply(null,arr);const e=arr.map(x=>Math.exp(x-m));const s=e.reduce((a,b)=>a+b,0)||1;return e.map(x=>x/s);}
+  function render(){
+    const dk=+$('#dk').value;
+    const s=Math.sqrt(dk);
+    $('#dkval').textContent=dk;
+    $('#sqrtval').textContent=s.toFixed(1);
+    const raw=BASE.map(x=>x*s);          // 点积 = 真实相似度 × √dₖ
+    const unscaled=softmax(raw);          // 不缩放
+    const scaled=softmax(BASE);           // 缩放（raw/√dₖ = base）
+    function bars(p){return p.map((v,i)=>`<div class="bar-row"><span class="k">${NAMES[i]}</span><span class="bar-track"><span class="bar-fill" style="width:${(v*100).toFixed(1)}%;background:${COLORS[i]}"></span></span><span class="pc">${(v*100).toFixed(1)}%</span></div>`).join('');}
+    $('#unscaled').innerHTML=bars(unscaled);
+    $('#scaled').innerHTML=bars(scaled);
+  }
+  $('#dk').addEventListener('input',render);
+  render();
+
+  const CORRECT={'1':'B','2':'B','3':'F','4':'A','5':'B'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经懂：<strong>维度越高分数越极端，除以 √dₖ 把它拉回，防止 softmax 押死、梯度消失</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

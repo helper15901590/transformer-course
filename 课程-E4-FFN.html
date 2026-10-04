@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E4 · FFN 前馈网络 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .ffn-flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;margin:1.2em 0}
+  .fbox{border:1.5px solid var(--rule-strong);border-radius:10px;padding:12px 16px;text-align:center;background:#FBFCFE;font-size:13.5px;line-height:1.5}
+  .fbox .d{font-family:var(--mono);font-size:12px;color:var(--ink-faint);display:block;margin-top:3px}
+  .fbox.wide{border-color:var(--violet);background:rgba(108,92,231,.07)}
+  .fbox.wide .d{color:var(--violet)}
+  .fbox.act{border-color:var(--signal);background:rgba(226,62,87,.07)}
+  .fbox.act .d{color:var(--signal)}
+  .farrow{font-family:var(--mono);color:var(--ink-faint);font-size:18px}
+  .contrast{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:1.2em 0}
+  @media(max-width:620px){.contrast{grid-template-columns:1fr}}
+  .cbox{background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:14px}
+  .cbox h4{margin:0 0 8px;font-family:var(--mono);font-size:12.5px}
+  .cbox h4.att{color:var(--violet)}.cbox h4.ffn{color:var(--amber)}
+  .cbox p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .stage-review{background:rgba(47,163,107,.08);border:1px solid rgba(47,163,107,.4);border-radius:14px;padding:20px 22px;margin-top:26px}
+  .stage-review b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--good);display:block;margin-bottom:10px}
+  .stage-review p{margin:0;font-size:15.5px;color:var(--ink-soft);line-height:1.85}
+  .stage-review .chain{font-family:var(--mono);font-size:14px;color:var(--ink);line-height:2}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">E4 · FFN 前馈网络</span><span><a href="课程-E3-残差与LayerNorm.html">← 回 E3</a> 　·　 第 17 关 / 共 23 关 · 约 20 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>注意力负责“词之间通信”，FFN 负责<strong>每个词自己再加工一遍</strong>——注意力之后的那一步。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 E · 让它变强 · 第 4 关（最后一关）</p>
+    <h1>FFN：注意力之后的加工</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>注意力干的是“词与词之间交换信息”（跨词）。但它本身只是“加权求和”，是个<strong>线性</strong>动作、缺“非线性”的加工力。这关学<strong>FFN（前馈网络）</strong>：注意力之后，对每个词<strong>单独再加工一遍</strong>，补上这份力。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>注意力把各个词的信息按权重“混合”了一遍。混完之后，每个词还需不需要“自己再消化一下”？</p>
+    <div class="guess">
+      <button data-g="yes">需要，得再加工</button>
+      <button data-g="no">不需要，混完就够了</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">先分清两件不同的活。</p>
+    <p><strong>注意力</strong>干的是“<span class="hl">通信</span>”：让每个词去别的词那里取信息，做“加权混合”。但“加权混合”本质上是<strong>线性</strong>的——就是把几份东西按比例加一加，自己能“变出的花样”有限。</p>
+    <p><strong>FFN</strong>干的是“<span class="hl">计算</span>”：对<strong>每个词单独</strong>地过一遍“升维 → 非线性 → 降维”，给它补上“非线性”的加工力。它不看别的词，只加工自己。</p>
+    <p>一句话记住分工：<strong>注意力让词“互相听得见”，FFN 让每个词“自己会想”。</strong></p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>需要</strong>”。加权混合是线性的、花样有限，得靠 FFN 补非线性。你猜对了吗？</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① FFN 是“逐词”的，不像注意力“跨词”。</strong>每个词各自独立过一遍，互不打扰。</p>
+      <p><strong>② FFN 是“先放大再缩小”：512 → 2048 → 512。</strong>中间加一层 ReLU（把负数清零）引入非线性。</p>
+      <p><strong>③ FFN 不是可有可无。</strong>有研究认为它像一块“记忆库”，存着大量知识。去掉它，模型能力大减。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>FFN 的结构，就一句话：<strong>两个全连接层，中间夹一个 ReLU</strong>。</p>
+    <p style="text-align:center;font-family:var(--mono);font-size:14px;margin:1em 0">FFN(x) = max(0, x W₁ + b₁) W₂ + b₂</p>
+    <p>数字上：先把 512 维<strong>放大</strong>到 2048 维，过 ReLU（<code>max(0,·)</code>，把负数变成 0），再<strong>缩回</strong> 512 维。</p>
+    <div class="ffn-flow">
+      <div class="fbox">词向量<span class="d">512 维</span></div>
+      <span class="farrow">→</span>
+      <div class="fbox wide">放大<span class="d">2048 维</span></div>
+      <span class="farrow">→</span>
+      <div class="fbox act">ReLU<span class="d">负数变 0</span></div>
+      <span class="farrow">→</span>
+      <div class="fbox">缩回<span class="d">512 维</span></div>
+    </div>
+    <p>为什么先放大再缩小？<span class="hl">放大到 2048 维，给了它“施展的空间”</span>，配合 ReLU 的非线性，就能表达更复杂的“想法”；最后缩回 512 维，好和下一层对齐。</p>
+    <div class="note"><span class="tag">跟着走一遍（ReLU 是啥）</span>
+      <p>ReLU 就是 <code>max(0, x)</code>：正数照旧、负数变 0。它简单，但正是这一步，打破了“线性”，让网络能学出非线性关系。（这一下，就是 FFN 存在的意义。）</p>
+    </div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：注意力让词之间“交织”，FFN 让每个词“各管各”。下面两幅图，哪幅是注意力、哪幅是 FFN？猜完看标注。</p>
+
+    <div class="contrast">
+      <div class="cbox">
+        <h4 class="att">A · 词与词“交织”</h4>
+        <p style="font-family:var(--mono);font-size:12.5px;line-height:2">词1 ⟷ 词2 ⟷ 词3<br>（互相取信息、互相影响）</p>
+        <p style="margin-top:8px">这是<strong>注意力</strong>：跨词通信。</p>
+      </div>
+      <div class="cbox">
+        <h4 class="ffn">B · 每个词“各管各”</h4>
+        <p style="font-family:var(--mono);font-size:12.5px;line-height:2">词1 ↓ 词2 ↓ 词3 ↓<br>（各自独立加工，互不干扰）</p>
+        <p style="margin-top:8px">这是<strong>FFN</strong>：逐词计算。</p>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 盯着 A、B 两幅图，把“交织=注意力、独立=FFN”记住。<br>2. 想一想：如果只有注意力、没有 FFN，模型会缺什么？<br>3. 再想一想：为什么 FFN 要“先放大到 2048 再缩回 512”？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">只有注意力，每个词就只会“按比例混合”，没有“自己深入加工”的能力（缺非线性）。FFN 先放大到 2048 维，给了它施展空间，再配合 ReLU 打破线性，最后缩回 512 维对齐。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>注意力和 FFN 的分工，正确的是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>注意力负责词之间“通信”，FFN 负责每个词自己“加工”</span></div><div class="opt" data-a="B"><span class="k">B</span><span>注意力负责加工，FFN 负责通信</span></div><div class="opt" data-a="C"><span class="k">C</span><span>两个干的是一模一样的事</span></div><div class="opt" data-a="D"><span class="k">D</span><span>FFN 是注意力的别名</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。注意力=跨词通信（互相取信息），FFN=逐词计算（各自加工）。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>FFN 的维度变化是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>512 → 2048 → 512</span></div><div class="opt" data-a="B"><span class="k">B</span><span>512 → 512 → 512</span></div><div class="opt" data-a="C"><span class="k">C</span><span>2048 → 512 → 2048</span></div><div class="opt" data-a="D"><span class="k">D</span><span>64 → 512 → 64</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。先放大到 2048（给施展空间），再缩回 512（和下一层对齐）。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：FFN 是“跨词”的——它会让一个词去影响另一个词。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。FFN 是<strong>逐词独立</strong>的，每个词各管各，不跨词。（跨词的是注意力。）</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>中间那个 ReLU（max(0,x)）起什么作用？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>引入非线性，让网络能学更复杂的关系</span></div><div class="opt" data-a="B"><span class="k">B</span><span>让数字变大</span></div><div class="opt" data-a="C"><span class="k">C</span><span>数一数有几个词</span></div><div class="opt" data-a="D"><span class="k">D</span><span>补上顺序</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。ReLU 把负数变 0，打破线性，让网络能表达非线性关系——这是 FFN 存在的意义。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】为什么 FFN 不是可有可无？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>它像一块“记忆库”，去掉它模型能力大减</span></div><div class="opt" data-a="B"><span class="k">B</span><span>它能让网页加载更快</span></div><div class="opt" data-a="C"><span class="k">C</span><span>它负责把中文翻译成英文</span></div><div class="opt" data-a="D"><span class="k">D</span><span>它其实可有可无，放着好看</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。有研究认为 FFN 像“记忆库”，存着大量知识，去掉它能力大减。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>注意力 = 跨词<strong>通信</strong>；FFN = 逐词<strong>计算</strong>（各管各）。</li>
+        <li>FFN 结构：<strong>512 → 2048 → 512</strong>，中间 ReLU 引入非线性。</li>
+        <li>FFN 不是可有可无——它补上“非线性加工力”，像块记忆库。</li>
+      </ol>
+    </div>
+
+    <div class="stage-review">
+      <b>🎉 阶段 E 回顾 · 注意力被“武装”起来了</b>
+      <p>学到这里，你应能一口气说出 E 段的四样升级：</p>
+      <p class="chain">多头（多角度）→ 位置编码（补顺序）→ 残差+Norm（稳训练）→ FFN（逐词加工）</p>
+      <p>至此，Transformer 的<strong>编码器一层</strong>已经齐了：多头注意力 + FFN，各带残差和 LayerNorm。下一阶段 F，就是把它<strong>堆 6 层、拼成整机</strong>。</p>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="从零到Transformer-学习地图.html">🎉 阶段 E 全部完成 · 回学习地图</a>
+      <div class="pending">下一站 <b>F1 · 编码器 × 6</b>。回一句"<b>开 F1</b>"，我就把它做出来；也可以 <a href="课程-00-Transformer全景图.html" style="color:var(--violet)">回全景图看一眼“你在这里”</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · E4 · FFN 前馈网络</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='yes'
+      ? '<strong>猜对了！</strong>加权混合是线性的、花样有限，得靠 FFN 补非线性加工。'
+      : '<strong>你选了“混完就够”。</strong>其实不够——注意力是线性的，得靠 FFN 补上非线性。';
+  }));
+
+  const CORRECT={'1':'A','2':'A','3':'F','4':'A','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！阶段 E 全部完成 🎉</h3><p>5 道全对。你已经懂：<strong>注意力跨词通信、FFN 逐词加工（512→2048→512 + ReLU），两者分工互补</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

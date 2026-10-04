@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D5 · 完整公式走一遍 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .formula{background:var(--ink);color:#fff;border-radius:14px;padding:20px 22px;margin:1.4em 0;text-align:center}
+  .formula .eq{font-family:var(--mono);font-size:clamp(15px,3vw,18px);line-height:1.9}
+  .formula .op{color:#FFB3C0}.formula .frac{display:inline-flex;flex-direction:column;vertical-align:middle;line-height:1.1;margin:0 .15em}.formula .frac .top{border-bottom:1px solid rgba(255,255,255,.5);padding:0 .3em}
+  .formula .frac .bot{padding:0 .3em}
+  .stepbar{display:flex;gap:6px;margin:0 0 18px;flex-wrap:wrap}
+  .stepbar .s{font-family:var(--mono);font-size:11.5px;padding:5px 11px;border-radius:20px;border:1px solid var(--rule);color:var(--ink-faint);background:#fff;white-space:nowrap;cursor:pointer}
+  .stepbar .s.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .stepbar .s.done{color:var(--ink-soft);border-color:var(--rule-strong)}
+  .matlabel{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink-soft);margin:0 0 8px}
+  .matgrid{display:inline-grid;gap:6px;margin-bottom:8px}
+  .matgrid .mc{width:52px;height:40px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;border:1px solid var(--rule);border-radius:6px;background:#FBFCFE}
+  .matgrid .mc.hot{background:rgba(108,92,231,.1);border-color:var(--violet);color:#3B2DB0;font-weight:700}
+  .matgrid .mc.res{background:rgba(226,62,87,.1);border-color:var(--signal);color:var(--signal);font-weight:700}
+  .matgrid .mc.tag{background:transparent;border:none;color:var(--ink-faint);font-size:11px;font-family:var(--sans)}
+  .steptext{font-size:14.5px;color:var(--ink-soft);line-height:1.75}
+  .steptext .mono{font-family:var(--mono);color:var(--violet);font-weight:700}
+  .stagewrap{display:flex;flex-direction:column;gap:10px}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .stage-review{background:rgba(47,163,107,.08);border:1px solid rgba(47,163,107,.4);border-radius:14px;padding:20px 22px;margin-top:26px}
+  .stage-review b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--good);display:block;margin-bottom:10px}
+  .stage-review p{margin:0;font-size:15.5px;color:var(--ink-soft);line-height:1.85}
+  .stage-review .chain{font-family:var(--mono);font-size:14px;color:var(--ink);line-height:2}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">D5 · 完整公式走一遍</span><span><a href="课程-D4-缩放.html">← 回 D4</a> 　·　 第 13 关 / 共 23 关 · 约 30 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>把 D1–D4 全部串成一条公式——<strong>attention(Q,K,V) = softmax(QKᵀ/√dₖ)·V</strong>。这是注意力的“总装”。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 D · 注意力的计算 · 第 5 关（最后一关）</p>
+    <h1>完整公式走一遍</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>D1–D4 学到的所有零件，这关<strong>拼成一条完整公式</strong>，并亲手从头到尾算一遍。学完这关，你就真正“会算注意力”了。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>把注意力从头到尾算完，一共要<strong>几个步骤</strong>？（提示：打分、缩放、……）</p>
+    <div class="guess">
+      <button data-g="2">2 步</button>
+      <button data-g="4">4 步</button>
+      <button data-g="6">6 步</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">把之前学的零件，全拼进一条公式。</p>
+    <div class="formula">
+      <div class="eq">Attention(Q, K, V) <span class="op">=</span> softmax<span style="font-size:1.2em">(</span>
+        <span class="frac"><span class="top">Q Kᵀ</span><span class="bot">√dₖ</span></span>
+        <span style="font-size:1.2em">)</span> V</div>
+    </div>
+    <p>别被它吓到——它就是把四个你已经会的东西接起来：</p>
+    <ul>
+      <li><strong>QKᵀ</strong>（D3）：每个 Q 点积每个 K，得分数表。</li>
+      <li><strong>÷√dₖ</strong>（D4）：缩放，稳住分数。</li>
+      <li><strong>softmax</strong>（C3）：把每一行变成加起来 100% 的权重。</li>
+      <li><strong>×V</strong>（下面讲）：按权重，把各个词的 V 加权求和，得到新向量。</li>
+    </ul>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是 <strong>4 步</strong>：打分 → 缩放 → softmax → 加权求和。你猜对了吗？</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 顺序不能乱。</strong>一定是 打分 → 缩放 → softmax → 加权。尤其“缩放要在 softmax 之前”。</p>
+      <p><strong>② 最后一步“×V”才是真正“取内容”。</strong>前面的打分、缩放、softmax 都是在算“该看重谁”；×V 才把内容按比例混进来。</p>
+      <p><strong>③ 结果还是“每个词一个新向量”。</strong>注意力输出和输入长得一样（还是 n 个向量），只是每个向量里已经混进了上下文。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>最后一步 <strong>×V（加权求和）</strong> 还差一句话没说透：把每一行的权重，拿去和各个词的 <strong>V</strong> 做“按比例混合”。</p>
+    <div class="note"><span class="tag">跟着走一遍（最后一步怎么算）</span>
+      <p>假设“我”这一行的权重是 <strong>[0.40, 0.20, 0.40]</strong>（对“我 / 爱 / 猫”各看多少）。三个词的 V 是：我=[1,0]、爱=[0,1]、猫=[1,1]。</p>
+      <p>“我”的新向量 ＝ 0.40×[1,0] ＋ 0.20×[0,1] ＋ 0.40×[1,1]<br>
+      ＝ [0.40, 0] ＋ [0, 0.20] ＋ [0.40, 0.40] ＝ <span class="hl">[0.80, 0.60]</span></p>
+      <p>看：这个新向量里，混进了“猫”和“爱”的信息。这就是“每个词读懂了上下文”。</p>
+    </div>
+    <p>把 4 步连起来，就是完整公式。下面实践节，带你从头到尾亲手走一遍。</p>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（分步走）</h2><span class="en">Practice</span></div>
+    <p>句子“<strong>我 爱 猫</strong>”，每个词的 Q、K、V 如下。点下面的步骤，从头走到尾。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 完整走一遍 4 步</span><span id="stepLabel">第 1 / 4 步</span></div>
+      <div class="card-b">
+        <div class="stepbar" id="stepbar"></div>
+        <div class="stagewrap" id="stage"></div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button id="prev">← 上一步</button>
+          <button class="primary" id="next">下一步 →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 点“下一步”走完 4 步，每一步看它在干嘛。<br>2. 走完后再倒着走一遍，确认每一格的数都看得懂。<br>3. 合上所有资料，能不能<strong>不看着</strong>把 4 步的名字背出来？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">4 步是：<strong>打分(QKᵀ) → 缩放(÷√dₖ) → softmax → 加权求和(×V)</strong>。能不看提示背出这 4 步，再配上完整公式，你就算出师了。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>完整公式 <code>attention(Q,K,V) = softmax(QKᵀ/√dₖ)·V</code>，正确的顺序是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>打分 → 缩放 → softmax → 加权求和</span></div><div class="opt" data-a="B"><span class="k">B</span><span>softmax → 打分 → 缩放 → 加权求和</span></div><div class="opt" data-a="C"><span class="k">C</span><span>缩放 → 打分 → 加权求和 → softmax</span></div><div class="opt" data-a="D"><span class="k">D</span><span>加权求和 → softmax → 打分 → 缩放</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。顺序不能乱：先打分 QKᵀ，再缩放 ÷√dₖ，再 softmax，最后 ×V 加权求和。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>真正“把内容取走、混进来”的，是哪一步？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>打分 QKᵀ</span></div><div class="opt" data-a="B"><span class="k">B</span><span>缩放 ÷√dₖ</span></div><div class="opt" data-a="C"><span class="k">C</span><span>softmax</span></div><div class="opt" data-a="D"><span class="k">D</span><span>×V 加权求和</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>D · ×V</strong>。前三步都在算“该看重谁”，只有 ×V 才按权重把各词的 V 混进来。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：注意力算完，输出还是 n 个词各一个向量，只是每个向量里已经混进了上下文。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。输入 n 个向量、输出还是 n 个向量，只是每个都“读懂了上下文”。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>【用得上】权重是 <code>[0.5, 0.5]</code>，两个词的 V 是 <code>[2,0]</code> 和 <code>[0,4]</code>，加权求和结果是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>[1, 2]</span></div><div class="opt" data-a="B"><span class="k">B</span><span>[2, 4]</span></div><div class="opt" data-a="C"><span class="k">C</span><span>[1, 1]</span></div><div class="opt" data-a="D"><span class="k">D</span><span>[0, 0]</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A · [1,2]</strong>。0.5×[2,0] + 0.5×[0,4] = [1,0] + [0,2] = [1,2]。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】softmax 应该在缩放的<strong>之前还是之后</strong>？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>之前（先 softmax 再缩放）</span></div><div class="opt" data-a="B"><span class="k">B</span><span>之后（先缩放再 softmax）</span></div><div class="opt" data-a="C"><span class="k">C</span><span>无所谓，先后一样</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B</strong>。必须先缩放、再 softmax——缩放就是为了让 softmax 别“押死”。公式里也是 QKᵀ/√dₖ 整个包在 softmax 里。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>完整公式：<strong>attention(Q,K,V) = softmax(QKᵀ/√dₖ)·V</strong>。</li>
+        <li>4 步顺序：<strong>打分 → 缩放 → softmax → 加权求和</strong>（顺序不能乱）。</li>
+        <li>前三步算“该看重谁”，<strong>×V 才是真正取内容</strong>；输出还是 n 个“读懂了上下文”的向量。</li>
+      </ol>
+    </div>
+
+    <div class="stage-review">
+      <b>🎉 阶段 D 回顾 · 你已打通注意力的计算</b>
+      <p>学到这里，你应能一口气说出整条链：</p>
+      <p class="chain">每个词变出 Q/K/V（D1–D2）→ 拿 Q 比 K 得分数 QKᵀ（D3）→ 除以 √dₖ 缩放（D4）→ softmax 成权重（C3）→ 乘 V 加权求和（D5）</p>
+      <p>这就是 <code>attention(Q,K,V)</code> 的全部。后面 E、F 阶段，就是在这块“注意力”之上做文章（多头、位置、拼整机）。</p>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="从零到Transformer-学习地图.html">🎉 阶段 D 全部完成 · 回学习地图</a>
+      <div class="pending">下一站 <b>E1 · 多头注意力</b>。回一句"<b>开 E1</b>"，我就把它做出来；也可以 <a href="课程-00-Transformer全景图.html" style="color:var(--violet)">回全景图看一眼“你在这里”</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · D5 · 完整公式走一遍</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='4'
+      ? '<strong>猜对了！</strong>4 步：打分 → 缩放 → softmax → 加权求和。'
+      : '<strong>你选了“'+b.textContent+'”。</strong>其实是 4 步，看下面。';
+  }));
+
+  /* 数据：3 词，2 维 */
+  const WORDS=['我','爱','猫'];
+  const Q=[[1,0],[0,1],[1,1]];
+  const K=[[1,0],[0,1],[1,1]];
+  const V=[[1,0],[0,1],[1,1]];
+  const dk=2, scale=Math.sqrt(dk);
+  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1];
+  const S=Q.map((qi,i)=>K.map((kj,j)=>dot(qi,kj)));       // 打分
+  const Sc=S.map(r=>r.map(x=>x/scale));                      // 缩放
+  const W=Sc.map(r=>{const m=Math.max.apply(null,r);const e=r.map(x=>Math.exp(x-m));const s=e.reduce((a,b)=>a+b,0)||1;return e.map(x=>x/s);}); // softmax
+  const O=W.map(r=>[0,1].map(d=>r.reduce((acc,w,k)=>acc+w*V[k][d],0))); // 加权求和
+
+  const STEPS=[
+    {t:'① 打分 QKᵀ',d:'每个 Q 点积每个 K，得到分数表。'},
+    {t:'② 缩放 ÷√dₖ',d:'√dₖ=√2≈1.41，把分数压小、稳住。'},
+    {t:'③ softmax',d:'每一行变成加起来 100% 的权重。'},
+    {t:'④ 加权求和 ×V',d:'按权重把各词的 V 混起来，得到新向量。'}
+  ];
+  let idx=0;
+
+  function matHTML(M,{rows,cols,tag,hotIdx,res}){
+    const rl=rows?`<div class="mc tag"></div>`:'';
+    let h='';
+    if(cols){h+=`<div class="mc tag"></div>`+cols.map(c=>`<div class="mc tag">${c}</div>`).join('');}
+    M.forEach((row,i)=>{
+      if(rows)h+=`<div class="mc tag">${rows[i]}</div>`;
+      row.forEach((v,j)=>{
+        let cls='mc';
+        if(res)cls+=' res';
+        else if(hotIdx && hotIdx[i]===j)cls+=' hot';
+        h+=`<div class="mc ${cls}">${typeof v==='number'?v.toFixed(2):v}</div>`;
+      });
+    });
+    return h;
+  }
+  function render(){
+    $('#stepbar').innerHTML=STEPS.map((s,i)=>`<span class="s ${i===idx?'on':(i<idx?'done':'')}" data-i="${i}">${i+1}. ${s.t.replace(/[①②③④] /,'')}</span>`).join('');
+    $('#stepLabel').textContent=`第 ${idx+1} / 4 步`;
+    $('#prev').disabled=idx===0;$('#next').disabled=idx===3;
+    let h='';
+    if(idx===0){
+      h=`<p class="steptext">每个词先有 Q、K、V（D1–D2）。下面给“我/爱/猫”各配好（都是 2 维，好算）：</p>`;
+      h+=`<p class="matlabel">Q　K　V</p>`;
+      h+='<div class="stagewrap">'+WORDS.map((w,i)=>`<div style="font-family:var(--mono);font-size:13px">${w}：Q=[${Q[i][0]},${Q[i][1]}]　K=[${K[i][0]},${K[i][1]}]　V=[${V[i][0]},${V[i][1]}]</div>`).join('')+'</div>';
+      h+=`<p class="steptext" style="margin-top:12px">点“下一步”，看第 1 步：拿 Q 去比 K。</p>`;
+    }else if(idx===1){
+      h=`<p class="matlabel">第 1 步结果：分数表 QKᵀ（3×3）</p>`;
+      h+=`<div class="matgrid" style="grid-template-columns:46px repeat(3,52px)">${matHTML(S,{rows:WORDS.map(w=>'Q·'+w),cols:WORDS.map(w=>'K·'+w)})}</div>`;
+      h+=`<p class="steptext">对角线（自己和自己）偏大。但现在分数还“没压住”，第 3 行已经有 2 了。</p>`;
+    }else if(idx===2){
+      h=`<p class="matlabel">第 2 步结果：÷√dₖ（≈1.41）</p>`;
+      h+=`<div class="matgrid" style="grid-template-columns:46px repeat(3,52px)">${matHTML(Sc,{rows:WORDS.map(w=>'Q·'+w),cols:WORDS.map(w=>'K·'+w)})}</div>`;
+      h+=`<p class="steptext">分数整体变小了（2 变成 1.41），但谁大谁小的顺序没变。</p>`;
+    }else if(idx===3){
+      h=`<p class="matlabel">第 3 步结果：softmax（每行加起来 = 100%）</p>`;
+      h+=`<div class="matgrid" style="grid-template-columns:46px repeat(3,52px)">${matHTML(W,{rows:WORDS.map(w=>'Q·'+w),cols:WORDS.map(w=>'K·'+w)})}</div>`;
+      h+=`<p class="steptext">每一行加起来都正好 1（100%）。这就是注意力权重。</p>`;
+    }else{
+      h=`<p class="matlabel">第 4 步结果：×V 加权求和（每个词的新向量）</p>`;
+      h+=`<div class="matgrid" style="grid-template-columns:46px repeat(2,52px)">${matHTML(O,{rows:WORDS.map(w=>'新·'+w),res:true})}</div>`;
+      h+=`<p class="steptext">每个词得到一个“新向量”，里面混进了其他词的内容——比如“我”的新向量 [0.80,0.60]，已经带上了“猫”和“爱”的信息。这就是“读懂了上下文”。</p>`;
+    }
+    $('#stage').innerHTML=h;
+  }
+  $('#next').addEventListener('click',()=>{if(idx<3){idx++;render();}});
+  $('#prev').addEventListener('click',()=>{if(idx>0){idx--;render();}});
+  $$('#stepbar').forEach(()=>{});
+  // 绑定步骤条点击
+  document.addEventListener('click',e=>{const t=e.target.closest('#stepbar .s');if(t){idx=+t.dataset.i;render();}});
+  render();
+
+  const CORRECT={'1':'A','2':'D','3':'T','4':'A','5':'B'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！阶段 D 全部完成 🎉</h3><p>5 道全对。你已经真正“会算注意力”了：<strong>attention(Q,K,V) = softmax(QKᵀ/√dₖ)·V</strong>，四步顺序也对。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

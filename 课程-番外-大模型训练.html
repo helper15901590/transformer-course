@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番外 · 主流大模型是怎么训出来的</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(26px,5.2vw,40px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+  .seg button{border:none;border-radius:0}.seg button+button{border-left:1px solid var(--rule-strong)}.seg button.on{background:var(--ink);color:#fff}.seg button.on:hover{color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .stage-info{background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:12px}
+  .stage-info h4{margin:0 0 10px;font-family:var(--mono);font-size:13px}
+  .stage-info .row{margin:6px 0;font-size:14px;color:var(--ink-soft)}
+  .stage-info .row b{color:var(--ink)}
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:1.2em 0}
+  @media(max-width:620px){.cmp{grid-template-columns:1fr}}
+  .cmpbox{background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:16px}
+  .cmpbox h4{margin:0 0 8px;font-family:var(--mono);font-size:13px}
+  .cmpbox.base h4{color:var(--amber)}.cmpbox.chat h4{color:var(--good)}
+  .cmpbox .q{font-family:var(--mono);font-size:13px;color:var(--ink-faint);margin:0 0 8px}
+  .cmpbox .a{font-size:14px;color:var(--ink-soft);background:#fff;border:1px dashed var(--rule-strong);border-radius:8px;padding:10px 12px}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">番外 · 大模型怎么训出来</span><span><a href="课程-番外-解码器流程.html">← 回上一节</a> 　·　 加餐课 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>上一节讲“怎么用”，这节讲“<strong>怎么训</strong>”——一台解码器大模型，要过<strong>三个阶段</strong>才变成会聊天的助手。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">番外 · 加餐课</p>
+    <h1>主流大模型：<br>是怎么训出来的</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>一个会聊天的 ChatGPT，不是"天生就会"，而是<strong>分三个阶段训出来的</strong>：先在全网文本上练基本功（预训练），再学怎么好好回答问题（微调），最后学做人（对齐）。这关把三个阶段一次讲清。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>一个会聊天的 AI，是<strong>天生就会聊</strong>，还是<strong>先苦练基本功、再学规矩、最后学做人</strong>？</p>
+    <div class="guess">
+      <button data-g="born">天生就会聊</button>
+      <button data-g="train">分三步训出来</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">用"培养一个人"来类比，最好懂。</p>
+    <p>大模型的训练，像培养一个人，分<strong>三步</strong>：</p>
+    <ul>
+      <li><strong>第一步 · 预训练</strong>：把全网的书、网页、文章全喂给它，让它"猜下一个字"。这一步像<strong>读书识字</strong>，学会语言和知识。最贵、最耗时。</li>
+      <li><strong>第二步 · 微调（SFT）</strong>：拿人工写的"问题-答案"对继续练，教它"别人问问题，你要按答案的方式回答"。像<strong>学规矩、学办事</strong>。</li>
+      <li><strong>第三步 · 对齐（RLHF/DPO）</strong>：让它的回答更符合人类口味——有用、不胡说、不冒犯。像<strong>学做人</strong>。</li>
+    </ul>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>分三步训出来</strong>”。没有天生会聊的 AI——都是先读书、再学规矩、最后学做人。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p>大模型训练三阶段：<strong>预训练（学知识）→ 微调（学回答）→ 对齐（学做人）</strong>。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 预训练不要人标数据，微调和对齐要。</strong>预训练是"猜下一个字"，答案就是文本本身（自监督）；后两步需要人工写问答、排偏好。</p>
+      <p><strong>② "基座模型" ≠ "聊天模型"。</strong>只预训练完的模型叫"基座模型"，它只会"续写"、不会"回答"；再经过微调+对齐，才是你用的那个会聊天的助手。</p>
+      <p><strong>③ RLHF 和 DPO 都是"对齐"的方法。</strong>RLHF 是老办法（先训个奖励模型再强化学习），DPO 是更简单的新办法，现在很多模型直接用 DPO。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>三个阶段，一张表看清（"吃什么、练什么、练成什么"）：</p>
+    <div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:14px;background:#fff;border:1px solid var(--rule);border-radius:10px;overflow:hidden">
+      <thead><tr><th style="font-family:var(--mono);font-size:11px;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC;padding:9px 14px;text-align:left">阶段</th><th style="font-family:var(--mono);font-size:11px;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC;padding:9px 14px;text-align:left">吃什么</th><th style="font-family:var(--mono);font-size:11px;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC;padding:9px 14px;text-align:left">练什么</th><th style="font-family:var(--mono);font-size:11px;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC;padding:9px 14px;text-align:left">练成什么</th></tr></thead>
+      <tbody>
+        <tr><td style="padding:9px 14px;border-bottom:1px solid var(--rule)"><strong>预训练</strong></td><td style="padding:9px 14px;border-bottom:1px solid var(--rule)">全网文本（几万亿字）</td><td style="padding:9px 14px;border-bottom:1px solid var(--rule)">猜下一个字</td><td style="padding:9px 14px;border-bottom:1px solid var(--rule)">语言 + 知识 + 推理</td></tr>
+        <tr><td style="padding:9px 14px;border-bottom:1px solid var(--rule)"><strong>微调 SFT</strong></td><td style="padding:9px 14px;border-bottom:1px solid var(--rule)">人工问答对</td><td style="padding:9px 14px;border-bottom:1px solid var(--rule)">照着问答对学</td><td style="padding:9px 14px;border-bottom:1px solid var(--rule)">会好好回答问题</td></tr>
+        <tr><td style="padding:9px 14px"><strong>对齐 RLHF/DPO</strong></td><td style="padding:9px 14px">人类偏好排序</td><td style="padding:9px 14px">让输出符合偏好</td><td style="padding:9px 14px">有用、不胡说、不冒犯</td></tr>
+      </tbody>
+    </table></div>
+    <p>三个阶段的成本差很多：<span class="hl">预训练占掉了绝大部分的算力和钱</span>（像读完整个图书馆），后面两步要的数据少得多、便宜得多。</p>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：同一个问题"1+1=？"，一个<strong>只做了预训练</strong>的模型，会怎么答？猜完点下面三个阶段看详情。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 点开三个阶段看详情</span>
+        <span class="seg" id="seg"><button data-s="0" class="on">① 预训练</button><button data-s="1">② 微调</button><button data-s="2">③ 对齐</button></span>
+      </div>
+      <div class="card-b" id="stageInfo"></div>
+    </div>
+
+    <div class="cmp">
+      <div class="cmpbox base">
+        <h4>基座模型（只预训练）</h4>
+        <p class="q">问："1+1=？"</p>
+        <p class="a">它接着往下"续写"：<br>"2、2+2=4、3+3=6、4+4=8……"<br>（答非所问，因为它只会"接话"）</p>
+      </div>
+      <div class="cmpbox chat">
+        <h4>聊天助手（三阶段训完）</h4>
+        <p class="q">问："1+1=？"</p>
+        <p class="a">"1+1=2。"<br>（正经回答，因为学过"要按答案的方式答"）</p>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 点三个阶段按钮，看每个阶段"吃什么、练什么、练成什么"。<br>2. 对比上面两个模型对同一问题的反应，感受"预训练"和"微调"的差别。<br>3. 想一想：为什么预训练最贵？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">预训练要"读完整个互联网"（几万亿字），海量算力、好几个月；后两步数据少得多、便宜得多。所以钱和算力，绝大部分花在预训练上。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，这节加餐就算吃下了</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>大模型训练的三个阶段，正确的顺序是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>预训练 → 微调 → 对齐</span></div><div class="opt" data-a="B"><span class="k">B</span><span>对齐 → 微调 → 预训练</span></div><div class="opt" data-a="C"><span class="k">C</span><span>微调 → 预训练 → 对齐</span></div><div class="opt" data-a="D"><span class="k">D</span><span>没有顺序，随便来</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。先预训练（学知识），再微调（学回答），最后对齐（学做人）。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>预训练这一步，模型在做什么任务？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>猜下一个字（自回归语言建模）</span></div><div class="opt" data-a="B"><span class="k">B</span><span>给图片分类</span></div><div class="opt" data-a="C"><span class="k">C</span><span>把中文翻成英文</span></div><div class="opt" data-a="D"><span class="k">D</span><span>判断情感好坏</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。预训练就是在海量文本上"猜下一个字"，答案就是文本本身，不用人标数据。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：预训练需要大量人工标注的问答数据。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。预训练是"猜下一个字"，标签就是文本自己（自监督），不需要人标。微调和对齐才需要人标数据。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>只做预训练、没做微调的"基座模型"，有什么特点？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>只会"续写"、不会好好"回答"</span></div><div class="opt" data-a="B"><span class="k">B</span><span>已经会好好聊天了</span></div><div class="opt" data-a="C"><span class="k">C</span><span>只会翻译</span></div><div class="opt" data-a="D"><span class="k">D</span><span>什么都不懂</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。基座模型只会"接话"（续写），不会按"答案"的方式回答——要微调+对齐才行。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】哪一步占掉了绝大部分的算力和钱？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>预训练（要读完全网文本）</span></div><div class="opt" data-a="B"><span class="k">B</span><span>微调</span></div><div class="opt" data-a="C"><span class="k">C</span><span>对齐</span></div><div class="opt" data-a="D"><span class="k">D</span><span>三步一样贵</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。预训练要在几万亿字上练，海量算力、好几个月；后两步数据少、便宜得多。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一节，带走三句话</b>
+      <ol>
+        <li>大模型三阶段：<strong>预训练（学知识）→ 微调（学回答）→ 对齐（学做人）</strong>。</li>
+        <li><strong>预训练</strong>在全网文本上"猜下一个字"，不用人标数据，但<strong>最贵</strong>。</li>
+        <li>只预训练 = 基座模型（会续写不会回答）；再微调+对齐 = 你用的聊天助手。</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · 番外 · 主流大模型是怎么训出来的</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='train'
+      ? '<strong>猜对了！</strong>没有天生会聊的 AI——都是先读书、再学规矩、最后学做人。'
+      : '<strong>你选了“天生就会聊”。</strong>其实不是——要经过预训练、微调、对齐三个阶段才学会聊天。';
+  }));
+
+  const STAGES=[
+    {name:'① 预训练 · 学知识', rows:[['吃什么','全网文本（书、网页、文章，几万亿字）'],['练什么','猜下一个字（自回归）'],['练成什么','语言 + 知识 + 推理'],['要人标数据吗','不要（答案就是文本本身）'],['成本','最贵，占绝大部分算力']]},
+    {name:'② 微调 SFT · 学回答', rows:[['吃什么','人工写的“问题-答案”对'],['练什么','照着问答对学“别人问、我要答”'],['练成什么','会按“答案”的方式好好回答'],['要人标数据吗','要（几万到几百万条问答对）'],['成本','便宜得多']]},
+    {name:'③ 对齐 RLHF/DPO · 学做人', rows:[['吃什么','人类对“两个回答哪个更好”的偏好排序'],['练什么','让输出符合人类偏好'],['练成什么','有用、不胡说、不冒犯'],['要人标数据吗','要（偏好排序）'],['成本','便宜']]}
+  ];
+  function show(i){
+    const S=STAGES[i];
+    $('#stageInfo').innerHTML=`<div class="stage-info"><h4>${S.name}</h4>`+S.rows.map(r=>`<div class="row"><b>${r[0]}</b>：${r[1]}</div>`).join('')+'</div>';
+  }
+  $$('#seg button').forEach(b=>b.addEventListener('click',()=>{$$('#seg button').forEach(x=>x.classList.toggle('on',x===b));show(+b.dataset.s);}));
+  show(0);
+
+  const CORRECT={'1':'A','2':'A','3':'F','4':'A','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！这节加餐吃下了</h3><p>5 道全对。你已经懂：<strong>大模型 = 预训练（学知识）→ 微调（学回答）→ 对齐（学做人），预训练最贵</strong>。</p>`;$('#quizResult').className='result show pass';$('#quizStatus').textContent='5 / 5 全对';}
+    else{h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

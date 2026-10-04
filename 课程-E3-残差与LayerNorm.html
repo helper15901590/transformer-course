@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E3 · 残差 + LayerNorm —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:var(--rule-strong);outline:none;margin:9px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff}
+  .Lrow{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;margin-bottom:14px}
+  .Lrow .lab{font-family:var(--mono);font-size:13px;color:var(--ink-soft)}
+  .Lrow .val{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--signal)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px}@media(max-width:620px){.two{grid-template-columns:1fr}}
+  .two h4{margin:0 0 10px;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft)}
+  .bigval{font-family:var(--mono);font-size:34px;font-weight:700;text-align:center;padding:20px 0}
+  .bigval .bar{display:block;height:10px;border-radius:5px;margin:0 auto 12px;transition:width .25s}
+  .cap2{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:10px;text-align:center}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">E3 · 残差 + LayerNorm</span><span><a href="课程-E2-位置编码.html">← 回 E2</a> 　·　 第 16 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>机器要<strong>堆 6 层</strong>才够强——这关的两个“配角”让堆得动、数值不崩。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 E · 让它变强 · 第 3 关</p>
+    <h1>残差 + LayerNorm：<br>让“叠很多层”成为可能</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>Transformer 每边要堆 6 层。但层一多，信息一层层传就<strong>衰减、走样</strong>，数值也<strong>越跑越偏</strong>。这关学两个“配角”怎么救场：<strong>残差连接</strong>（抄近路）和 <strong>LayerNorm</strong>（拉稳数值）。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>信息要经过 6 层，每层都做一次变换。一路传下去，最原始的信息会怎样？</p>
+    <div class="guess">
+      <button data-g="fade">会越来越淡、走样</button>
+      <button data-g="keep">完好无损，一点不变</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">两个问题，分别有解药。</p>
+    <p><strong>问题一：信息传着传着会“淡掉”。</strong>每过一层就做一次变换，变换来变换去，最原始的信息越来越模糊。层越深，越容易忘掉“本来是什么”。</p>
+    <p><strong>解药一：残差连接。</strong>给信息开一条“抄近路”：每层不光往下传变换后的结果，还<strong>把输入原封不动地加上去</strong>。写成 <code>x + 变换(x)</code>。这样不管多少层，最原始的信息都“兜底”保留着。</p>
+    <p><strong>问题二：数值越跑越偏。</strong>每层都乘来乘去，数值可能越来越大（爆炸）或越来越小（消失）。</p>
+    <p><strong>解药二：LayerNorm。</strong>每过一层，把每个词向量重新“拉回”正常范围（均值 0、方差 1），不让数值跑飞。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>越来越淡</strong>”。所以需要残差“抄近路”兜底。你猜对了吗？</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 残差和 LayerNorm 是两个不同的东西。</strong>残差管“信息别丢”（抄近路），LayerNorm 管“数值别跑偏”（拉稳）。别混成一个。</p>
+      <p><strong>② 残差 = “加法抄近路”，不是“替换”。</strong>是 x + 变换(x)，不是丢掉 x。</p>
+      <p><strong>③ LayerNorm 是“按单个词、跨维度”归一化</strong>，和按“一批样本”的 BatchNorm 不是一回事（这里知道名字即可）。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p><strong>残差连接</strong>，就一句话：<code>x + Sublayer(x)</code>。每层把“输入 x”和“这一层算出来的东西”加起来，作为输出。好处是：<span class="hl">给梯度（和原始信息）开了一条高速公路</span>，多少层都能训得动。</p>
+    <p><strong>LayerNorm</strong>，也是一句话：把每个词的向量重新缩放成“均值 0、方差 1”，让数值始终落在舒服的范围。好处是：<span class="hl">不管堆多少层，数值都不会跑飞</span>。</p>
+    <div class="note"><span class="tag">跟着走一遍（残差为什么有用）</span>
+      <p>假设每层会把信号“打个折”（×0.8）：<br>
+      没残差：过 6 层后 ≈ 0.8⁶ ≈ <strong>0.26</strong>（几乎丢光了）<br>
+      有残差：x + 0.8x，过 6 层后 ≈ 1 + 0.8⁶ ≈ <strong>1.26</strong>（稳稳兜底在 1 附近）<br>
+      看，残差让最原始的信息始终“在场”。</p>
+    </div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：把层数拉大，左边“没残差”的信号会掉到多低？右边“有残差”会不会稳稳不动？猜完再拖。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 层数越多，差别越大</span></div>
+      <div class="card-b">
+        <div class="Lrow">
+          <span class="lab">堆叠层数 = <span class="val" id="Lval">6</span></span>
+          <input type="range" id="L" min="1" max="24" value="6" step="1" style="max-width:280px">
+        </div>
+        <div class="two">
+          <div>
+            <h4>❌ 没残差（每层 ×0.8）</h4>
+            <div class="bigval"><span class="bar" id="nobar" style="background:#E23E57"></span><span id="noval">0.26</span></div>
+          </div>
+          <div>
+            <h4>✅ 有残差（x + 0.8x）</h4>
+            <div class="bigval"><span class="bar" id="resbar" style="background:#2FA36B"></span><span id="resval">1.26</span></div>
+          </div>
+        </div>
+        <p class="cap2">初始信号 = 1.0。没残差会一路衰减到接近 0；有残差始终兜底在 1 附近。</p>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 把层数拖到 24，看左边“没残差”掉到多低（几乎 0）。<br>2. 再看右边“有残差”——是不是稳稳停在 1 附近？<br>3. 想一想：为什么堆 6 层、甚至更多，都离不开残差？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">因为层越多，原始信息越容易在一层层变换中衰减、走样。残差给原始信息开了“抄近路”，让它每层都“兜底”在场，所以堆多少层都稳。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>残差连接解决的是什么问题？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>信息一层层传会衰减、走样——残差开“抄近路”兜底</span></div><div class="opt" data-a="B"><span class="k">B</span><span>词的意思记不住</span></div><div class="opt" data-a="C"><span class="k">C</span><span>顺序分不清</span></div><div class="opt" data-a="D"><span class="k">D</span><span>算得太慢</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。层越多信息越容易衰减，残差 = x + 变换(x)，让原始信息每层都兜底。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>残差连接写成式子是什么？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>x + 变换(x)</span></div><div class="opt" data-a="B"><span class="k">B</span><span>x × 变换(x)</span></div><div class="opt" data-a="C"><span class="k">C</span><span>变换(x) − x</span></div><div class="opt" data-a="D"><span class="k">D</span><span>丢掉 x，只留变换(x)</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A · x + 变换(x)</strong>。把输入原样加上去，不是乘、不是减、不是丢。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>LayerNorm 解决的是什么问题？<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>数值越跑越偏——它把数值拉回正常范围</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>词序分不清——它补上顺序</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。LayerNorm 管数值：把每个词向量拉回均值 0、方差 1，防止数值爆炸或消失。（补顺序是位置编码的事，不是它。）</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>判断：残差和 LayerNorm 是同一个东西的两种叫法。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。残差管“信息别丢”（抄近路），LayerNorm 管“数值别跑偏”（拉稳），是两个东西。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】每层把信号“打折”到 0.8，堆 6 层、没残差，信号大约剩多少？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>约 0.26（几乎丢光）</span></div><div class="opt" data-a="B"><span class="k">B</span><span>约 4.8</span></div><div class="opt" data-a="C"><span class="k">C</span><span>还是 1，不变</span></div><div class="opt" data-a="D"><span class="k">D</span><span>约 0.8</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。0.8⁶ ≈ 0.26，一层层打折，6 层后几乎丢光——这就是为什么要残差。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li><strong>残差 = x + 变换(x)</strong>：抄近路，让信息别丢、深层也能训。</li>
+        <li><strong>LayerNorm</strong>：把数值拉回均值 0 方差 1，别跑飞。</li>
+        <li>两个是不同的东西：一个管“信息”，一个管“数值”。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-E4-FFN.html">✅ 过关，进入下一关：E4 · FFN（前馈网络）→</a>
+      <div class="pending">如果点不动（比如在预览小窗里）——E4 还没生成——回一句"<b>开 E4</b>"，我就把它做出来；也可以 <a href="课程-E2-位置编码.html" style="color:var(--violet)">回 E2 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · E3 · 残差 + LayerNorm</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='fade'
+      ? '<strong>猜对了！</strong>信息一层层传会越来越淡、走样——所以需要残差抄近路。'
+      : '<strong>你选了“完好无损”。</strong>其实会衰减——层越多越淡，这正是残差要解决的。';
+  }));
+
+  function render(){
+    const L=+$('#L').value;
+    $('#Lval').textContent=L;
+    const no=Math.pow(0.8,L);
+    const res=1+Math.pow(0.8,L);
+    $('#noval').textContent=no.toFixed(3);
+    $('#resval').textContent=res.toFixed(3);
+    const noW=Math.max(4,no*140), resW=Math.max(4,res*60);
+    $('#nobar').style.width=noW+'px';
+    $('#resbar').style.width=resW+'px';
+  }
+  $('#L').addEventListener('input',render);
+  render();
+
+  const CORRECT={'1':'A','2':'A','3':'T','4':'F','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经懂：<strong>残差 = x+变换(x) 抄近路兜底，LayerNorm 把数值拉稳，两者各管一摊</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

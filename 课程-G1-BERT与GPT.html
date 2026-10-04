@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G1 · 从 Transformer 到 BERT / GPT —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .half{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:1.2em 0}
+  @media(max-width:620px){.half{grid-template-columns:1fr}}
+  .hbox{background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:16px}
+  .hbox h4{margin:0 0 8px;font-family:var(--mono);font-size:13px}
+  .hbox.bert h4{color:var(--violet)}.hbox.gpt h4{color:var(--signal)}
+  .hbox p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+  .hbox .tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:20px;border:1px solid var(--rule);color:var(--ink-faint);margin-top:8px}
+  .taskrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .taskrow button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .verdict{margin-top:14px;padding:14px 16px;border-radius:10px;background:rgba(108,92,231,.06);border:1px solid rgba(108,92,231,.25);font-size:14.5px;color:var(--ink-soft);min-height:2.6em}
+  .verdict b{color:var(--ink)}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">G1 · BERT / GPT</span><span><a href="课程-F4-注意力辨析.html">← 回 F4</a> 　·　 第 22 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>Transformer 是<strong>骨架</strong>。这关看两种“用法”：只用编码器 = BERT，只用解码器 = GPT。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 G · 出路 · 第 1 关</p>
+    <h1>从 Transformer 到 BERT / GPT</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>你已经懂整台 Transformer（编码器+解码器）了。但后来那些大名鼎鼎的模型，很多<strong>只用一半</strong>：BERT 只用编码器，GPT 只用解码器。这关看清这两种“用法”，你就知道这门课通向哪里了。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>Transformer 有“编码器 + 解码器”两半。做一个只会“理解句子”的模型（不用它生成新句子），可以用哪一半？</p>
+    <div class="guess">
+      <button data-g="enc">只用编码器</button>
+      <button data-g="dec">只用解码器</button>
+      <button data-g="both">必须两半都用</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">两种活儿，对应两种“半边”。</p>
+    <p><strong>“理解”类任务</strong>（判断情感、分类、问答找答案）：只需要把句子<strong>读懂</strong>，不需要“生成新句子”。所以只用<strong>编码器</strong>那半边就够——这就是 <span class="hl">BERT</span> 的思路。</p>
+    <p><strong>“生成”类任务</strong>（接着写、聊天）：需要一个词一个词地<strong>生成</strong>，所以只用<strong>解码器</strong>那半边——这就是 <span class="hl">GPT</span> 的思路。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>只用编码器</strong>”。理解类任务不需要生成，编码器（BERT）就够了。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p><strong>BERT = 只用编码器（读懂）</strong>；<strong>GPT = 只用解码器（生成）</strong>。同一副骨架，两种用法。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① BERT 是“双向”看，GPT 是“单向”看。</strong>编码器没有掩码，能看前也看后（双向）；GPT 用解码器，有掩码，只能从左往右看（单向）。</p>
+      <p><strong>② BERT 训练靠“填空”，GPT 训练靠“接话”。</strong>一个把中间词遮住猜，一个接着往下写。</p>
+      <p><strong>③ BERT 出“理解”，GPT 出“文字”。</strong>别把它们当成能互相替代的同一个东西。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <div class="half">
+      <div class="hbox bert">
+        <h4>BERT · 只用编码器</h4>
+        <p>把整句一次性“读懂”（能看前也能看后）。训练时靠“填空”：遮住中间一个词，让它猜。</p>
+        <span class="tag">擅长：分类 / 情感 / 问答找答案</span>
+      </div>
+      <div class="hbox gpt">
+        <h4>GPT · 只用解码器</h4>
+        <p>一个词一个词地“接着写”（只能看左边，不偷看未来）。训练时靠“接话”：给上文，猜下一个词。</p>
+        <span class="tag">擅长：续写 / 聊天 / 生成</span>
+      </div>
+    </div>
+    <div class="note"><span class="tag">为什么能只拿一半</span>
+      <p>因为编码器和解码器<strong>本身都是完整的“读/写机器”</strong>：编码器会“读”，解码器会“写”。要读就拆编码器，要写就拆解码器——骨架一样，拼法不同。</p>
+    </div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：下面几个任务，各该用“编码器类”还是“解码器类”？点一下看答案。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 给任务挑“半边”</span></div>
+      <div class="card-b">
+        <div class="taskrow" id="tasks"></div>
+        <div class="verdict" id="verdict">点一个任务，看它该用哪半边。</div>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 依次点几个任务，感受“要读懂→编码器”“要生成→解码器”。<br>2. 想一想：聊天机器人（像 ChatGPT 那样）该用哪半边？<br>3. 再想一想：判断一条评论是好评还是差评，该用哪半边？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">聊天机器人要“一个词一个词地生成回复”，用<strong>解码器（GPT 类）</strong>；判断好评/差评只需“读懂”，用<strong>编码器（BERT 类）</strong>。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>BERT 用的是 Transformer 的哪一半？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>只用编码器</span></div><div class="opt" data-a="B"><span class="k">B</span><span>只用解码器</span></div><div class="opt" data-a="C"><span class="k">C</span><span>编码器+解码器都用</span></div><div class="opt" data-a="D"><span class="k">D</span><span>都不用</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。BERT 只用编码器，负责“读懂”。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>BERT 和 GPT 最大的区别是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>BERT 用编码器（双向、读懂），GPT 用解码器（单向、生成）</span></div><div class="opt" data-a="B"><span class="k">B</span><span>一个用中文，一个用英文</span></div><div class="opt" data-a="C"><span class="k">C</span><span>一个快一个慢</span></div><div class="opt" data-a="D"><span class="k">D</span><span>没有区别</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。BERT 双向读懂（编码器），GPT 单向生成（解码器）。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：GPT 用的是带掩码的解码器，只能从左往右看。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。GPT 用解码器，带因果掩码，只能看已写出的词（单向）。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>BERT 训练时靠什么任务？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>填空：遮住中间词猜</span></div><div class="opt" data-a="B"><span class="k">B</span><span>接话：猜下一个词</span></div><div class="opt" data-a="C"><span class="k">C</span><span>翻译</span></div><div class="opt" data-a="D"><span class="k">D</span><span>画图</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。BERT 靠“填空”（遮词猜）训练，所以能双向理解。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】判断一条评论是“好评还是差评”，最适合用哪类模型？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>编码器类（BERT），因为它只需“读懂”</span></div><div class="opt" data-a="B"><span class="k">B</span><span>解码器类（GPT），因为要生成</span></div><div class="opt" data-a="C"><span class="k">C</span><span>哪个都行，没差别</span></div><div class="opt" data-a="D"><span class="k">D</span><span>都不用模型</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。判断好坏只需“读懂”，用编码器（BERT 类）最合适。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li><strong>BERT = 只用编码器</strong>（双向读懂，靠填空训练）。</li>
+        <li><strong>GPT = 只用解码器</strong>（单向生成，靠接话训练）。</li>
+        <li>骨架都是 Transformer——<strong>要读拆编码器，要写拆解码器</strong>。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-G2-综合自测.html">✅ 过关，进入最后一关：G2 · 综合自测 →</a>
+      <div class="pending">如果点不动（比如在预览小窗里）——G2 还没生成——回一句"<b>开 G2</b>"，我就把它做出来；也可以 <a href="课程-F4-注意力辨析.html" style="color:var(--violet)">回 F4 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · G1 · 从 Transformer 到 BERT / GPT</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='enc'
+      ? '<strong>猜对了！</strong>理解类任务不用生成，只用编码器（BERT）就够。'
+      : '<strong>再想想。</strong>其实“只理解、不生成”，编码器那半边就够了——这就是 BERT。';
+  }));
+
+  const TASKS=[
+    {t:'判断好评差评', which:'编码器', why:'只需“读懂”，不用生成新句子。'},
+    {t:'翻译', which:'编码器+解码器', why:'要读懂源句、再生成译文，两半都用（原始 Transformer）。'},
+    {t:'聊天接话', which:'解码器', why:'要一个词一个词生成回复，用 GPT 类。'},
+    {t:'问答找答案', which:'编码器', why:'从文章里“找”答案，重在读懂。'}
+  ];
+  $('#tasks').innerHTML=TASKS.map((x,i)=>`<button data-i="${i}">${x.t}</button>`).join('');
+  $$('#tasks button').forEach(b=>b.addEventListener('click',()=>{
+    const T=TASKS[+b.dataset.i];
+    $$('#tasks button').forEach(x=>x.classList.toggle('on',x===b));
+    $('#verdict').innerHTML=`<b>${T.t}</b> → 该用 <b>${T.which}</b>：${T.why}`;
+  }));
+
+  const CORRECT={'1':'A','2':'A','3':'T','4':'A','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经懂：<strong>BERT 用编码器（双向读懂）、GPT 用解码器（单向生成），同一副骨架两种用法</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

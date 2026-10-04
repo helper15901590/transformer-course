@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B1 · 从词到向量 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  canvas{width:100%;height:auto;display:block;border-radius:10px}
+  .cap{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:10px;text-align:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  table.dict{border-collapse:collapse;width:100%;font-size:14.5px;background:#fff;border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+  table.dict th,table.dict td{padding:9px 14px;border-bottom:1px solid var(--rule);text-align:left}
+  table.dict th{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC}
+  table.dict tr:last-child td{border-bottom:none}table.dict tr.sel{background:rgba(226,62,87,.07)}table.dict tr{cursor:pointer;transition:background .12s}table.dict tr:hover{background:#FBFCFE}table.dict .vec{font-family:var(--mono);color:var(--ink-soft)}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+  .cmp{margin-top:16px;padding:14px 16px;border-radius:10px;background:rgba(108,92,231,.06);border:1px solid rgba(108,92,231,.25);font-size:14.5px;color:var(--ink-soft)}
+  .cmp b{color:var(--ink)}.cmp .num{font-family:var(--mono);color:var(--violet);font-weight:700;font-size:17px}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">B1 · 从词到向量</span><span><a href="课程-A3-矩阵乘法.html">← 回 A3</a> 　·　 第 4 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>把每个“词”配上一串数字——这是“那张表”从“词”变成“数字”的地方。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 B · 词怎么变成数 · 第 1 关</p>
+    <h1>从词到向量：<br>给每个词配一串数字</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>阶段 A 把“东西”变成了数字串。现在轮到<strong>“词”</strong>——电脑不认识字，那“猫”“狗”怎么变成一串数字？你会认识一个名字：<strong>词嵌入</strong>。用纸笔就行。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>想表示“猫和狗更像、猫和汽车没那么像”。下面两种做法，你觉得哪种能行？</p>
+    <div class="guess">
+      <button data-g="num">给词排号：猫=1、狗=2、汽车=3</button>
+      <button data-g="vec">给每个词配一串数字</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面看谁对。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">先回顾一句，再往前走一步。</p>
+    <p>阶段 A 我们干了这么件事：把一个<strong>东西</strong>身上的几个特点变成数字，凑成一串数（向量）。可电脑真正要处理的是<strong>词</strong>：“猫”“狗”“苹果”……它不认识字，只认数字，所以每个词也得变成一串数字。</p>
+    <div class="note warn"><span class="tag">说清一件事</span><p>电脑其实<strong>收不到真的“东西”</strong>——它摸不到苹果、也看不到猫，能送进去的只有<strong>文字，也就是“词”</strong>。所以 A1 拿水果举例，只是给你一个“把东西变成数字”的画面；真正要被变成数字的“东西”，<strong>就是词本身</strong>。A1 的“东西”和这里的“词”，是<strong>同一个动作的两种说法</strong>。</p></div>
+    <p>最简单的办法是给词<strong>排个号</strong>：猫=1、狗=2、苹果=3……但你马上发现问题：<span class="hl">编号只表示“排在第几”，不代表“意思像不像”。</span>按编号，猫（1）和狗（2）差 1、猫（1）和苹果（3）差 2——可这个“差”纯属碰巧，跟意思无关。</p>
+    <p>所以换个更好的办法：<strong>不给词排一个号，而是给每个词配<em>一串</em>固定长度的数字</strong>（比如 4 个数、或 512 个数）。这串数字就是这个词的<strong>词向量</strong>。给词配上向量这件事，叫 <span class="hl">词嵌入</span>。</p>
+    <div class="note"><span class="tag">一句话记住</span><p>词嵌入 = <strong>给每个词配一串固定的数字</strong>，意思差不多的词，配到的数字串也很接近。它就像一本字典——只不过查出来的不是解释，而是一串数字。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 词嵌入不是“给词排号”。</strong>排号只有一个数、跟意思无关；词嵌入是<strong>一串数</strong>，专门用来带“意思”。</p>
+      <p><strong>② d_model 是“每个词用几个数”，不是“词表里有多少词”。</strong>这个词表有多少词，是另一回事。</p>
+      <p><strong>③ 这些数字是机器“学”出来的，不是人写的。</strong>一开始是乱数，练着练着才有意义。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <div class="note"><span class="tag">先认识两个词（这一关要用到）</span>
+      <p><strong>词表</strong>：这台机器认识的所有词，列成的一份清单（像一本词典的目录）。<br><strong>词嵌入</strong>（英文 embedding，“装进去”的意思）：把每个词变成一串数字这件事。</p>
+    </div>
+    <p>具体怎么做？就是<strong>查一张大表</strong>：左边一列是词，右边一列是它对应的那串数字。机器见到一个词，就去表里把那串数字取出来。就这么简单。</p>
+    <div style="overflow-x:auto;margin:1.3em 0">
+      <table class="dict" style="min-width:340px">
+        <thead><tr><th>词</th><th>它对应的向量</th></tr></thead>
+        <tbody><tr><td>猫</td><td class="vec">[9, 1, 3, 2]</td></tr><tr><td>狗</td><td class="vec">[8, 2, 3, 1]</td></tr><tr><td>苹果</td><td class="vec">[2, 6, 1, 9]</td></tr></tbody>
+      </table>
+    </div>
+    <p>表里每个词后面的数字，个数都<strong>一样多</strong>（这里都是 4 个）。这个“每个词用几个数”的数字，在论文里叫 <span class="hl">d_model</span>——就是 A1 说的“维度”。论文里 d_model = 512，意思是<strong>每个词用 512 个数来表示</strong>。</p>
+    <div class="note"><span class="tag">跟着走一遍</span><p>假设这台机器的词表里有 <strong>10000 个词</strong>、d_model = <strong>512</strong>。那这张“大表”就是 <strong>10000 行 × 512 列</strong>：一行一个词，一行里有 512 个数。查“猫”，就是把“猫”那一行的 512 个数整行取出来。</p></div>
+    <p>最后，最关键的一点：<strong>这些数字不是人定好的，是机器自己“学”出来的。</strong>一开始全是随便写的乱数；练得越多，这些数字才慢慢变得“有道理”——意思相近的词，数字串也慢慢靠到一起。（怎么“学”是后面的事，现在知道“是学出来的”就够。）</p>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p>左边是词表（每个词配了 2 个数的向量，方便画在平面上），右边是它们的“位置地图”。<strong>先猜</strong>：点“猫”和“狗”，比点“猫”和“汽车”，哪个点积更大？猜完再点。</p>
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 谁和谁的意思更近</span></div>
+      <div class="card-b">
+        <div class="grid2">
+          <div><table class="dict" id="dictTable"></table><p class="cap" style="text-align:left;margin-top:10px">点两个词，下面就会算它俩像不像。</p></div>
+          <div><canvas id="map" width="340" height="300"></canvas><p class="cap">意思近的词，在地图上挨得近（颜色一样的是同一类）。</p></div>
+        </div>
+        <div class="cmp" id="cmp">在上面的清单里点一个词，再点第二个词，我来算它俩的“像不像”。</div>
+      </div>
+    </div>
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 点“猫”和“狗”，看它俩的点积大不大。<br>2. 点“猫”和“汽车”，对比一下，是大还是小。<br>3. 用一句大白话回答：为什么“猫”和“狗”挨得近、“猫”和“汽车”离得远？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">因为“猫”和“狗”都是动物、意思近，机器把它俩的数字配得很像（点积大、地图上挨得近）；“猫”和“汽车”意思差得远，数字就不像（点积小、离得远）。这正是词嵌入想要的效果。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>“词嵌入”做的事，是下面哪一件？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>给每个词排一个号（1、2、3……）</span></div><div class="opt" data-a="B"><span class="k">B</span><span>给每个词配一串固定的数字，意思近的数字串也近</span></div><div class="opt" data-a="C"><span class="k">C</span><span>把中文词翻译成英文</span></div><div class="opt" data-a="D"><span class="k">D</span><span>数一数每个词出现了几次</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B</strong>。词嵌入就是给每个词配一串数字，让意思近的词，数字串也接近。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>论文里说 d_model = 512，指的是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>词表里一共有 512 个词</span></div><div class="opt" data-a="B"><span class="k">B</span><span>每个词用 512 个数来表示</span></div><div class="opt" data-a="C"><span class="k">C</span><span>一共有 512 个句子</span></div><div class="opt" data-a="D"><span class="k">D</span><span>训练了 512 轮</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B</strong>。d_model 就是“每个词用几个数表示”，也就是 A1 说的“维度”。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：给词排个号（猫=1、狗=2、苹果=3）就够了，因为编号能表示两个词的意思像不像。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。编号只表示“排在第几”，跟意思没关系。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>判断：意思相近的两个词，它们的向量也比较接近。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。意思近 → 数字串近，这正是词嵌入想要的效果。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】词表有 10000 个词、d_model = 512。这张“大表”有多大？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>10000 行 × 512 列</span></div><div class="opt" data-a="B"><span class="k">B</span><span>512 行 × 512 列</span></div><div class="opt" data-a="C"><span class="k">C</span><span>10000 行 × 10000 列</span></div><div class="opt" data-a="D"><span class="k">D</span><span>512 个数</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。一行一个词，所以有 10000 行；每个词 512 个数，所以 512 列。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>词嵌入 = <strong>给每个词配一串固定的数字</strong>，意思近的数字串也近。</li>
+        <li><strong>d_model</strong> = 每个词用几个数（就是“维度”），不是词表有多少词。</li>
+        <li>这些数字是机器<strong>学出来</strong>的：一开始是乱数，练着练着才有意义。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-B2-向量里装了什么.html">✅ 过关，进入下一关：B2 · 向量里装了什么 →</a>
+      <div class="pending">如果点不动（比如在预览小窗里），就 <a href="课程-B2-向量里装了什么.html" style="color:var(--violet)">在新窗口打开 B2</a>，或回一句"<b>开 B2</b>"；也可以 <a href="课程-A3-矩阵乘法.html" style="color:var(--violet)">回 A3 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · B1 · 从词到向量（词嵌入）</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='vec'
+      ? '<strong>猜对了！</strong>给每个词配一串数字（词嵌入），才能表示“意思像不像”。排号做不到。'
+      : '<strong>你选了“排号”。</strong>可惜排号只表示位置，跟意思无关——真正管用的是给每个词配一串数字。';
+  }));
+
+  const VOCAB=[
+    {w:'猫',v:[9,1],c:'#E23E57'},{w:'狗',v:[8.5,1.5],c:'#E23E57'},{w:'老虎',v:[9.5,0.8],c:'#E23E57'},
+    {w:'汽车',v:[1,9],c:'#0E9AA7'},{w:'飞机',v:[1.2,9.4],c:'#0E9AA7'},{w:'自行车',v:[1.5,6],c:'#0E9AA7'},
+    {w:'苹果',v:[4.5,2.5],c:'#F2B23E'},{w:'面包',v:[4,3],c:'#F2B23E'}
+  ];
+  let picked=[];
+  function renderTable(){
+    let h='<thead><tr><th>词</th><th>它的向量</th></tr></thead><tbody>';
+    VOCAB.forEach((o,i)=>{h+=`<tr data-i="${i}" class="${picked.includes(i)?'sel':''}"><td><span class="sw" style="background:${o.c}"></span>${o.w}</td><td class="vec">[${o.v[0]}, ${o.v[1]}]</td></tr>`;});
+    $('#dictTable').innerHTML=h+'</tbody>';
+    $$('#dictTable tr[data-i]').forEach(tr=>tr.addEventListener('click',()=>toggle(+tr.dataset.i)));
+  }
+  function toggle(i){const k=picked.indexOf(i);if(k>=0)picked.splice(k,1);else{picked.push(i);if(picked.length>2)picked.shift();}renderTable();renderMap();renderCmp();}
+  function renderCmp(){
+    const el=$('#cmp');
+    if(picked.length<2){el.innerHTML='在上面的清单里点一个词，再点第二个词，我来算它俩的“像不像”。';return;}
+    const A=VOCAB[picked[0]],B=VOCAB[picked[1]];
+    const dot=A.v[0]*B.v[0]+A.v[1]*B.v[1];
+    let v;if(dot>=60)v='<strong>很像</strong>（多半是同一类）';else if(dot>=30)v='<strong>有点像</strong>（沾点边）';else v='<strong>不太像</strong>（离得远）';
+    el.innerHTML=`${A.w} 的向量 [${A.v[0]}, ${A.v[1]}]，${B.w} 的向量 [${B.v[0]}, ${B.v[1]}]。<br>它俩的点积 = <span class="num">${dot.toFixed(1)}</span> → ${v}。<br><span style="font-size:13px">（点积越大越像，这是 A2 学的。）</span>`;
+  }
+  const map=$('#map');
+  function dpr(){return Math.min(2,window.devicePixelRatio||1);}
+  function renderMap(){
+    const w=340,h=300;map.width=w*dpr();map.height=h*dpr();
+    const ctx=map.getContext('2d');ctx.setTransform(dpr(),0,0,dpr(),0,0);ctx.clearRect(0,0,w,h);
+    const padL=36,padT=16,padB=34,padR=16;
+    ctx.strokeStyle='#E7ECF5';ctx.lineWidth=1;
+    for(let t=0;t<=10;t++){const gx=padL+(w-padL-padR)*t/10,gy=(h-padB)-(h-padT-padB)*t/10;ctx.beginPath();ctx.moveTo(gx,padT);ctx.lineTo(gx,h-padB);ctx.stroke();ctx.beginPath();ctx.moveTo(padL,gy);ctx.lineTo(w-padR,gy);ctx.stroke();}
+    ctx.strokeStyle='#B9C6DC';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(padL,h-padB);ctx.lineTo(w-padR,h-padB);ctx.moveTo(padL,h-padB);ctx.lineTo(padL,padT);ctx.stroke();
+    ctx.fillStyle='#8A94AC';ctx.font='11px sans-serif';ctx.fillText('“活物” →',padL+(w-padL-padR)/2-22,h-padB+22);ctx.save();ctx.translate(13,padT+80);ctx.rotate(-Math.PI/2);ctx.fillText('“能载人” →',0,0);ctx.restore();
+    VOCAB.forEach((o,i)=>{const gx=padL+(w-padL-padR)*o.v[0]/10,gy=(h-padB)-(h-padT-padB)*o.v[1]/10;if(picked.includes(i)){ctx.strokeStyle=o.c;ctx.lineWidth=3;ctx.beginPath();ctx.arc(gx,gy,12,0,7);ctx.stroke();}ctx.fillStyle=o.c;ctx.beginPath();ctx.arc(gx,gy,7,0,7);ctx.fill();ctx.fillStyle='#0E1A32';ctx.font='600 11px sans-serif';ctx.fillText(o.w,gx+10,gy-9);});
+    ctx.fillStyle='#8A94AC';ctx.font='11px sans-serif';ctx.fillText('（横竖两个方向是我编的教学轴）',padL-6,h-8);
+  }
+  renderTable();renderMap();renderCmp();
+
+  const CORRECT={'1':'B','2':'B','3':'F','4':'T','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经搞懂：<strong>词嵌入 = 给每个词配一串数字，意思近的数字串也近；d_model 就是每个词用几个数</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

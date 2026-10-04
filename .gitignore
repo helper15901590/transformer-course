@@ -1,0 +1,13 @@
+# ── 系统自动生成的垃圾文件（不需要上传）──
+.DS_Store          # macOS 自动生成的文件夹配置
+Thumbs.db          # Windows 缩略图缓存
+desktop.ini        # Windows 文件夹显示配置
+
+# ── 编辑器产生的东西 ──
+.vscode/
+.idea/
+*.swp
+*~
+
+# ── 临时文件 ──
+*.tmp

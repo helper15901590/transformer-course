@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attention Is All You Need · 从零搞懂 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8;
+    --paper-2:#FFFFFF;
+    --panel:#FFFFFF;
+    --ink:#0E1A32;
+    --ink-soft:#56617E;
+    --ink-faint:#8A94AC;
+    --rule:#D5DEEC;
+    --rule-strong:#B9C6DC;
+    --grid:rgba(120,140,180,.11);
+    --signal:#E23E57;
+    --violet:#6C5CE7;
+    --teal:#0E9AA7;
+    --amber:#F2B23E;
+    --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04), 0 10px 30px -18px rgba(14,26,50,.35);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,"Times New Roman",serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code","Consolas","Liberation Mono","Courier New",monospace;
+    --col:72ch;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+
+  body{
+    margin:0;
+    font-family:var(--sans);
+    color:var(--ink);
+    background-color:var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:28px 28px;
+    line-height:1.75;
+    font-size:16.5px;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  a{color:inherit}
+  ::selection{background:rgba(226,62,87,.18)}
+
+  /* ---------- 定位说明 ---------- */
+  .notice-banner{max-width:1180px;margin:0 auto;padding:14px clamp(20px,5vw,48px) 0}
+  .notice-banner .inner{background:rgba(242,178,62,.14);border:1px solid rgba(217,160,46,.5);border-radius:10px;padding:12px 16px;font-size:14px;color:var(--ink-soft);line-height:1.6}
+  .notice-banner b{color:#9A6E10}
+  .notice-banner a{color:var(--violet);font-weight:700;text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4)}
+  .notice-banner a:hover{border-color:var(--violet)}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    position:relative;
+    border-bottom:1px solid var(--rule-strong);
+    background:
+      radial-gradient(120% 100% at 0% 0%, #ffffff 0%, rgba(255,255,255,0) 55%),
+      var(--paper);
+    overflow:hidden;
+  }
+  .hero-inner{
+    max-width:1180px;
+    margin:0 auto;
+    padding:clamp(40px,7vw,88px) clamp(20px,5vw,48px) clamp(36px,5vw,64px);
+    display:grid;
+    grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);
+    gap:clamp(24px,5vw,64px);
+    align-items:center;
+  }
+  .kicker{
+    font-family:var(--mono);
+    font-size:12.5px;
+    letter-spacing:.14em;
+    color:var(--signal);
+    text-transform:uppercase;
+    margin:0 0 18px;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+  }
+  .kicker::before{content:"";width:26px;height:1px;background:var(--signal)}
+  h1.title{
+    font-family:var(--serif);
+    font-weight:800;
+    font-size:clamp(34px,6.4vw,68px);
+    line-height:1.02;
+    letter-spacing:-.02em;
+    margin:0 0 6px;
+    color:var(--ink);
+  }
+  h1.title .zh{
+    display:block;
+    font-size:clamp(15px,2vw,19px);
+    font-weight:500;
+    letter-spacing:.02em;
+    color:var(--ink-soft);
+    margin-top:16px;
+    font-family:var(--sans);
+    line-height:1.6;
+  }
+  .hero-meta{
+    margin-top:28px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px 22px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--ink-faint);
+  }
+  .hero-meta b{color:var(--ink-soft);font-weight:600}
+
+  /* hero heatmap */
+  .hero-viz{
+    justify-self:center;
+    width:100%;
+    max-width:420px;
+  }
+  .hero-viz .cap{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-faint);
+    margin-top:14px;
+    text-align:center;
+    letter-spacing:.02em;
+  }
+
+  /* ---------- LAYOUT ---------- */
+  .layout{
+    max-width:1180px;
+    margin:0 auto;
+    padding:0 clamp(16px,5vw,48px);
+    display:grid;
+    grid-template-columns:210px minmax(0,1fr);
+    gap:clamp(24px,5vw,64px);
+    align-items:start;
+  }
+  .rail{
+    position:sticky;
+    top:0;
+    padding:44px 0 44px;
+    max-height:100vh;
+    overflow-y:auto;
+    font-size:13.5px;
+    scrollbar-width:thin;
+  }
+  .rail h2{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin:0 0 14px;
+    font-weight:600;
+  }
+  .rail ol{list-style:none;margin:0;padding:0;counter-reset:none}
+  .rail li{margin:0}
+  .rail a{
+    display:flex;
+    gap:9px;
+    padding:5px 0 5px 14px;
+    text-decoration:none;
+    color:var(--ink-soft);
+    border-left:2px solid transparent;
+    line-height:1.35;
+    transition:color .15s,border-color .15s,padding .15s;
+  }
+  .rail a .n{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-faint);
+    padding-top:2px;
+    min-width:16px;
+  }
+  .rail a:hover{color:var(--ink)}
+  .rail a.active{color:var(--signal);border-left-color:var(--signal);padding-left:16px}
+  .rail a.active .n{color:var(--signal)}
+
+  main.doc{
+    min-width:0;
+    padding:44px 0 96px;
+  }
+
+  /* ---------- CONTENT ---------- */
+  section.chapter{
+    scroll-margin-top:24px;
+    margin:0 0 clamp(56px,9vw,104px);
+  }
+  .ch-head{
+    display:flex;
+    align-items:baseline;
+    gap:16px;
+    margin:0 0 8px;
+    padding-bottom:14px;
+    border-bottom:1px solid var(--rule);
+  }
+  .ch-num{
+    font-family:var(--mono);
+    font-size:12px;
+    font-weight:600;
+    color:var(--signal);
+    letter-spacing:.06em;
+    flex:none;
+    padding-top:6px;
+  }
+  .ch-title{
+    font-family:var(--serif);
+    font-size:clamp(23px,3.4vw,32px);
+    font-weight:700;
+    line-height:1.2;
+    letter-spacing:-.01em;
+    margin:0;
+  }
+  .prose{max-width:var(--col)}
+  .prose > p{margin:0 0 1.15em}
+  .prose > p:last-child{margin-bottom:0}
+  .lede{
+    font-size:1.12em;
+    color:var(--ink-soft);
+    line-height:1.7;
+  }
+  .prose h3{
+    font-family:var(--sans);
+    font-weight:700;
+    font-size:1.06em;
+    margin:2em 0 .7em;
+    letter-spacing:.01em;
+  }
+  .prose ul,.prose ol{max-width:var(--col);padding-left:1.3em;margin:0 0 1.15em}
+  .prose li{margin:.35em 0}
+  .prose strong{font-weight:700;color:var(--ink)}
+  .hl{color:var(--signal);font-weight:700}
+  .hl-v{color:var(--violet);font-weight:700}
+  .hl-t{color:var(--teal);font-weight:700}
+
+  code{
+    font-family:var(--mono);
+    font-size:.86em;
+    background:rgba(108,92,231,.09);
+    color:#42309E;
+    padding:2px 6px;
+    border-radius:4px;
+    white-space:nowrap;
+  }
+
+  /* callouts */
+  .note{
+    max-width:var(--col);
+    border-left:3px solid var(--violet);
+    background:rgba(108,92,231,.055);
+    padding:16px 20px;
+    margin:1.6em 0;
+    border-radius:0 8px 8px 0;
+  }
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.10)}
+  .note.good{border-left-color:var(--good);background:rgba(47,163,107,.09)}
+  .note .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--violet);
+    display:block;
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  .note.warn .tag{color:#B77F12}
+  .note.good .tag{color:var(--good)}
+  .note p{margin:0}
+  .note p+p{margin-top:.6em}
+
+  /* formula */
+  .formula{
+    max-width:var(--col);
+    background:var(--panel);
+    border:1px solid var(--rule);
+    border-radius:10px;
+    padding:18px 20px;
+    margin:1.6em 0;
+    box-shadow:var(--shadow);
+    overflow-x:auto;
+  }
+  .formula .fname{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-bottom:10px;
+  }
+  .formula .eq{
+    font-family:var(--mono);
+    font-size:clamp(14px,2.4vw,17px);
+    line-height:1.7;
+    color:var(--ink);
+    white-space:nowrap;
+  }
+  .formula .eq .op{color:var(--signal)}
+  .formula .eq .sm{color:var(--violet)}
+  .formula .eq .var{color:var(--ink)}
+  .formula .gloss{
+    margin-top:12px;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    font-family:var(--sans);
+    line-height:1.7;
+    white-space:normal;
+  }
+  sub,sup{font-size:.72em}
+  .frac{
+    display:inline-flex;
+    flex-direction:column;
+    vertical-align:middle;
+    text-align:center;
+    line-height:1.15;
+    margin:0 .15em;
+    position:relative;top:-1px;
+  }
+  .frac .top{padding:0 .3em}
+  .frac .bot{padding:0 .3em;border-top:1px solid currentColor}
+
+  /* generic demo card */
+  .demo{
+    margin:1.8em 0;
+    background:var(--panel);
+    border:1px solid var(--rule);
+    border-radius:12px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .demo-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+    padding:13px 18px;
+    border-bottom:1px solid var(--rule);
+    background:linear-gradient(180deg,#FBFCFE,#F4F7FC);
+  }
+  .demo-head .t{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    font-weight:600;
+    display:flex;align-items:center;gap:9px;
+  }
+  .demo-head .t::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--signal);box-shadow:0 0 0 3px rgba(226,62,87,.15)}
+  .demo-body{padding:20px}
+
+  button, .btn{
+    font-family:var(--sans);
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--ink);
+    background:#fff;
+    border:1px solid var(--rule-strong);
+    border-radius:8px;
+    padding:7px 14px;
+    cursor:pointer;
+    transition:background .14s,border-color .14s,transform .06s,color .14s;
+    line-height:1.2;
+  }
+  button:hover{border-color:var(--signal);color:var(--signal)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}
+  button.primary:hover{background:#CB3049;color:#fff}
+  button.ghost{background:transparent;border-color:transparent;color:var(--ink-soft);padding:7px 9px}
+  button.ghost:hover{color:var(--signal);background:rgba(226,62,87,.07)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+
+  .ctrl-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0;padding:7px 13px}
+  .seg button+button{border-left:1px solid var(--rule-strong)}
+  .seg button.on{background:var(--ink);color:#fff}
+  .seg button.on:hover{color:#fff}
+
+  /* matrix rendering */
+  .matrix{display:inline-grid;gap:6px}
+  .matrix .mrow{display:flex;gap:6px}
+  .cell{
+    min-width:52px;
+    height:40px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);
+    font-size:13px;
+    border-radius:6px;
+    border:1px solid var(--rule);
+    background:#fff;
+    position:relative;
+  }
+  .cell.label{background:transparent;border:none;color:var(--ink-faint);min-width:auto;font-size:11.5px}
+  .mat-label{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--ink-soft);
+    margin:0 0 8px;
+    font-weight:600;
+  }
+  .mats{display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start}
+  .mat-block{position:relative}
+
+  .stepbar{
+    display:flex;gap:6px;margin:0 0 18px;flex-wrap:wrap;
+  }
+  .stepbar .s{
+    font-family:var(--mono);
+    font-size:11.5px;
+    padding:5px 11px;
+    border-radius:20px;
+    border:1px solid var(--rule);
+    color:var(--ink-faint);
+    background:#fff;
+    white-space:nowrap;
+  }
+  .stepbar .s.done{color:var(--ink-soft);border-color:var(--rule-strong)}
+  .stepbar .s.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);font-family:var(--mono);margin-top:14px}
+  .legend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  .hint{font-size:13px;color:var(--ink-faint);margin-top:12px;line-height:1.6}
+
+  /* slider */
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;
+    width:100%;height:4px;border-radius:2px;
+    background:var(--rule-strong);outline:none;margin:8px 0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;
+    width:16px;height:16px;border-radius:50%;
+    background:var(--signal);cursor:pointer;border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.25);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px;height:16px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff;
+  }
+  input[type=number]{
+    font-family:var(--mono);font-size:13px;
+    border:1px solid var(--rule-strong);border-radius:6px;
+    padding:5px 7px;width:64px;color:var(--ink);
+  }
+
+  /* softmax bars */
+  .bars{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+  .bar-row{display:grid;grid-template-columns:34px 1fr 62px;gap:12px;align-items:center}
+  .bar-row .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);text-align:right}
+  .bar-track{display:block;height:20px;background:rgba(14,26,50,.06);border-radius:5px;overflow:hidden}
+  .bar-fill{display:block;height:100%;border-radius:5px;transition:width .28s cubic-bezier(.4,0,.2,1)}
+  .bar-row .v{font-family:var(--mono);font-size:12px;color:var(--ink);text-align:right}
+
+  /* accordion */
+  .qa{max-width:var(--col);border-top:1px solid var(--rule)}
+  .qa-item{border-bottom:1px solid var(--rule)}
+  .qa-q{
+    width:100%;
+    display:grid;grid-template-columns:auto 1fr auto;
+    gap:14px;align-items:baseline;
+    background:none;border:none;
+    text-align:left;
+    padding:18px 4px;
+    font-family:var(--sans);
+    font-size:15.5px;
+    font-weight:600;
+    color:var(--ink);
+    cursor:pointer;
+    line-height:1.5;
+  }
+  .qa-q:hover{color:var(--signal)}
+  .qa-q .qn{font-family:var(--mono);font-size:12px;color:var(--signal);font-weight:600}
+  .qa-q .chev{font-family:var(--mono);color:var(--ink-faint);transition:transform .2s;font-size:14px}
+  .qa-item.open .qa-q .chev{transform:rotate(45deg)}
+  .qa-a{
+    max-height:0;overflow:hidden;
+    transition:max-height .3s ease;
+  }
+  .qa-a-inner{padding:0 4px 20px 34px;color:var(--ink-soft);font-size:15px;line-height:1.78}
+  .qa-a-inner p{margin:0 0 .8em}
+  .qa-a-inner p:last-child{margin-bottom:0}
+  .qa-a-inner .ans-tag{
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--good);font-weight:600;display:block;margin-bottom:6px;
+  }
+
+  /* table */
+  .tbl-wrap{max-width:100%;overflow-x:auto;margin:1.6em 0;border:1px solid var(--rule);border-radius:10px;background:#fff;box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+  th,td{padding:11px 15px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+  thead th{background:#F4F7FC;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:rgba(108,92,231,.035)}
+  td .yes{color:var(--good);font-weight:700}
+  td .no{color:var(--signal);font-weight:700}
+
+  /* architecture diagram */
+  .arch{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin:1.6em 0}
+  @media(max-width:640px){.arch{grid-template-columns:1fr}}
+  .arch-col{background:#fff;border:1px solid var(--rule);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+  .arch-col .hd{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:14px;text-align:center}
+  .block{
+    border:1px solid var(--rule-strong);
+    border-radius:8px;
+    padding:11px 13px;
+    margin-bottom:9px;
+    font-size:13.5px;
+    background:#FBFCFE;
+    position:relative;
+    line-height:1.45;
+  }
+  .block .sub{font-size:11.5px;color:var(--ink-faint);font-family:var(--mono);display:block;margin-top:3px}
+  .block.att{background:rgba(108,92,231,.08);border-color:var(--violet)}
+  .block.att-mask{background:rgba(226,62,87,.07);border-color:var(--signal)}
+  .block.cross{background:rgba(14,154,167,.09);border-color:var(--teal)}
+  .block.ffn{background:rgba(242,178,62,.12);border-color:#D9A02E}
+  .block.norm{background:#F4F7FC;color:var(--ink-soft);font-family:var(--mono);font-size:12px;text-align:center;padding:7px}
+  .between{text-align:center;color:var(--ink-faint);font-size:12px;margin:2px 0 8px;font-family:var(--mono)}
+  .xN{font-family:var(--mono);font-size:11px;color:var(--signal);position:absolute;top:-8px;right:10px;background:#fff;padding:0 6px;border:1px solid var(--rule);border-radius:20px}
+
+  .kv-note{font-size:13px;color:var(--ink-faint);font-family:var(--mono);text-align:center;margin-top:12px}
+
+  footer{
+    border-top:1px solid var(--rule-strong);
+    background:var(--paper);
+    padding:36px 24px 56px;
+  }
+  footer .f-inner{max-width:1180px;margin:0 auto;font-size:13px;color:var(--ink-faint);line-height:1.7}
+  footer .f-inner b{color:var(--ink-soft)}
+
+  .hamb{
+    display:none;
+  }
+
+  @media (max-width:900px){
+    .hero-inner{grid-template-columns:1fr}
+    .hero-viz{order:-1;max-width:340px}
+    .layout{grid-template-columns:1fr}
+    .rail{
+      position:sticky;top:0;z-index:40;max-height:none;overflow:visible;
+      margin:0 clamp(-16px,-5vw,-48px);padding:10px clamp(16px,5vw,48px);
+      background:rgba(237,241,248,.94);
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid var(--rule);
+      white-space:nowrap;
+    }
+    .rail h2{display:none}
+    .rail ol{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+    .rail ol::-webkit-scrollbar{display:none}
+    .rail a{border-left:none;border-bottom:2px solid transparent;padding:8px 10px;white-space:nowrap}
+    .rail a.active{border-left:none;border-bottom-color:var(--signal);padding-left:10px}
+    main.doc{padding-top:26px}
+    .qa-a-inner{padding-left:4px}
+  }
+  .mats-wrap{overflow-x:auto;padding-bottom:4px}
+  .num-inline{font-family:var(--mono);font-size:13.5px;color:var(--ink)}
+</style>
+</head>
+<body>
+
+<div class="notice-banner"><div class="inner"><b>定位说明：</b>这是一份「复习手册」，不是课程的起点。建议先按 <a href="从零到Transformer-学习地图.html">学习地图</a> 从 A1 一路学到 F 段，再用这份手册查漏补缺、复习公式。</div></div>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <p class="kicker">2017 · Google Brain / Google Research</p>
+      <h1 class="title">Attention Is All You Need
+        <span class="zh">从零搞懂 Transformer——一篇论文如何重写了整个 AI 的底层结构。<br>不背书，先动手：看每个词怎么"互相打分"。</span>
+      </h1>
+      <div class="hero-meta">
+        <span><b>作者</b> Vaswani 等 8 人</span>
+        <span><b>任务</b> 机器翻译</span>
+        <span><b>核心</b> 自注意力</span>
+        <span><b>阅读时长</b> 约 40 分钟</span>
+      </div>
+    </div>
+    <div class="hero-viz">
+      <div id="heroHeat"></div>
+      <p class="cap">自注意力权重：每个词对一句话里其他词的关注强度</p>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="rail" aria-label="目录">
+    <h2>目录</h2>
+    <ol id="toc">
+      <li><a href="#s1"><span class="n">01</span><span>为什么需要它</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>注意力的直觉</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Q、K、V 三件事</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>缩放点积注意力</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>Softmax 是什么</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>为什么除以 √dₖ</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>多头注意力</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>位置编码</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>整体架构</span></a></li>
+      <li><a href="#s10"><span class="n">10</span><span>掩码</span></a></li>
+      <li><a href="#s11"><span class="n">11</span><span>训练细节</span></a></li>
+      <li><a href="#s12"><span class="n">12</span><span>与 RNN/CNN 对比</span></a></li>
+      <li><a href="#s13"><span class="n">13</span><span>概念分析题</span></a></li>
+      <li><a href="#s14"><span class="n">14</span><span>计算小题</span></a></li>
+      <li><a href="#s15"><span class="n">15</span><span>速查表</span></a></li>
+    </ol>
+  </nav>
+
+  <main class="doc">
+
+    <section class="chapter" id="s1">
+      <div class="ch-head"><span class="ch-num">01</span><h2 class="ch-title">先讲人话：它到底解决了什么</h2></div>
+      <div class="prose">
+        <p class="lede">在 2017 年之前，处理"一句话"这类序列数据主要靠 RNN / LSTM。它们有一个天生的毛病：<strong>必须从左到右一个词一个词地读</strong>，像用一根手指点着念书。这带来三个痛点。</p>
+        <p><strong>第一，慢。</strong>第 100 个词必须等前 99 个词算完才能开始，GPU 再多也没法并行——因为顺序是被写死的。</p>
+        <p><strong>第二，忘。</strong>信息要沿着链条一格一格往后传，传到很远的地方就衰减了。句子开头的主语，到句尾时模型可能已经"记不清"了（长距离依赖问题）。</p>
+        <p><strong>第三，路径长。</strong>要让第 1 个词影响第 10 个词，信息得走 9 步。步数越多，学起来越难。</p>
+        <p>Transformer 的想法很直接：<span class="hl">既然"逐个传递"又慢又健忘，那能不能让每个词一上来就直接看到句子里的所有词，自己决定该关注谁？</span>这就是<strong>自注意力（Self-Attention）</strong>。所有词并行计算，任意两个词之间的"距离"都是 <strong>1 步</strong>——第 1 个词和第 100 个词是直接对话的，不隔着任何人。</p>
+        <div class="note">
+          <span class="tag">一句话记住</span>
+          <p>RNN 是"传话游戏"（一个接一个，越传越变形）；Transformer 是"开会"（所有人同时发言，每个人按相关度听所有人的话）。</p>
+        </div>
+        <p>论文标题里那个残缺的句子正是它的态度：<em>Attention Is All You Need</em>——<strong>你需要的只是注意力</strong>。它干脆把循环结构整个删掉，只留下注意力。</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="s2">
+      <div class="ch-head"><span class="ch-num">02</span><h2 class="ch-title">注意力的直觉：给每个词配一副"眼镜"</h2></div>
+      <div class="prose">
+        <p class="lede">看这句话：<strong>"小猫 蹲在 垫子 上，因为 它 累了。"</strong></p>
+        <p>读到"它"的时候，你脑子里会自动补一句："它 = 小猫"。你是怎么做到的？你在心里<strong>把"它"和前面的每个词比对了一遍</strong>，发现"小猫"最搭，于是把注意力多半分给了"小猫"。</p>
+        <p>自注意力干的就是这件事。对句子里的<strong>每一个词</strong>，它都会算出一组"关注分数"，表示这个词要花多少心思去看其他每个词。分数归一化后加起来等于 1——就像把 100% 的注意力按比例分配出去。</p>
+        <p>更妙的是，每个词最后得到的新表示，是<strong>所有词的信息按注意力比例加权求和</strong>的结果。所以处理完一轮后，"它"这个位置的向量里，已经融进了"小猫"的信息。</p>
+      </div>
+
+      <div class="demo">
+        <div class="demo-head">
+          <span class="t">动手 01 · 一句注意力是怎么分配的</span>
+          <div class="ctrl-row">
+            <button class="ghost" id="sentPrev">← 换一句</button>
+            <button class="ghost" id="sentNext">换一句 →</button>
+          </div>
+        </div>
+        <div class="demo-body">
+          <div id="sentViz"></div>
+          <p class="hint">点任意一个词作为"提问者"，看它把注意力分给了谁。颜色越暖 = 关注越强。</p>
+        </div>
+      </div>
+
+      <div class="prose">
+        <p>注意几个关键点：<strong>分数是模型自己学出来的</strong>，不是人写死的规则。训练时模型会发现"形容词该多看名词""代词该回头看它指代的对象"这类规律。</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="s3">
+      <div class="ch-head"><span class="ch-num">03</span><h2 class="ch-title">Q、K、V：一个词拆成三个角色</h2></div>
+      <div class="prose">
+        <p class="lede">怎么把"比对"变成可计算的运算？论文用了一个巧妙的分身：每个词的向量会被投影成三个不同的向量，分别扮演三个角色——<span class="hl">Query（查询）</span>、<span class="hl-v">Key（键）</span>、<span class="hl-t">Value（值）</span>。</p>
+        <p>最贴切的类比是<strong>图书馆检索</strong>：</p>
+        <ul>
+          <li><span class="hl">Query（Q）</span>：你想找的那本书的"查询词"。是"我这个词，想找什么？"</li>
+          <li><span class="hl-v">Key（K）</span>：每本书书脊上的"标签"。是"我这个词，能被什么条件匹配到？"</li>
+          <li><span class="hl-t">Value（V）</span>：书里的"内容"。一旦被匹配上，真正取出来用的信息就是这个。</li>
+        </ul>
+        <p>流程就是：拿你的 <strong>Query</strong> 去和屋里每本书的 <strong>Key</strong> 比一比（做点积，越像分数越高），看谁的标签最匹配；然后按匹配度，把各本书的 <strong>Value</strong> 按比例混合，得到你要的结果。</p>
+        <div class="note">
+          <span class="tag">为什么非要拆成三个</span>
+          <p>因为"找什么"（Q）、"凭什么被找到"（K）、"拿出什么"（V）是三件不同的事。让模型用<strong>不同的权重矩阵</strong>（W<sup>Q</sup>、W<sup>K</sup>、W<sup>V</sup>）去投影，它才有空间学出"用什么标准匹配、匹配上后取什么"。</p>
+        </div>
+        <p>那 Q、K、V 从哪来？都是从<strong>同一个词的向量</strong>乘不同矩阵得到的。因为 Q 和 K 都来自同一句话里的词，这种"自己关注自己"的机制就叫<strong>自注意力（Self-Attention）</strong>。每个词的向量通常先来自词嵌入（embedding），再加上位置信息（第 08 节讲）。</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="s4">
+      <div class="ch-head"><span class="ch-num">04</span><h2 class="ch-title">核心：缩放点积注意力（动手算一遍）</h2></div>
+      <div class="prose">
+        <p class="lede">现在把 Q、K、V 拼成矩阵，整个注意力机制其实只有一个公式——论文里最重要的那个。</p>
+        <div class="formula">
+          <div class="fname">Scaled Dot-Product Attention · 缩放点积注意力</div>
+          <div class="eq">
+            Attention(Q,K,V) <span class="op">=</span> <span class="sm">softmax</span><span style="font-size:1.3em">(</span>
+            <span class="frac"><span class="top">Q K<sup>T</sup></span><span class="bot">√d<sub>k</sub></span></span>
+            <span style="font-size:1.3em">)</span> V
+          </div>
+          <div class="gloss">Q、K、V 都是矩阵；<code>QK<sup>T</sup></code> 给每对词打分；除以 √d<sub>k</sub> 稳住数值；softmax 把每行变成概率；最后乘以 V 做加权求和。</div>
+        </div>
+        <p>别被符号吓到，它一共只有<strong>四步</strong>。下面这个小工具把每一步都摊开，你可以点着"下一步"亲自走一遍（用 4 个词、每个词的维度 d<sub>k</sub>=3 的小例子）：</p>
+      </div>
+
+      <div class="demo">
+        <div class="demo-head">
+          <span class="t">动手 02 · 分步走完整条计算链</span>
+          <div class="ctrl-row">
+            <div class="seg" id="d2Preset">
+              <button class="on" data-p="0">示例 A</button>
+              <button data-p="1">示例 B</button>
+            </div>
+            <button id="d2Rand">随机重采样</button>
+          </div>
+        </div>
+        <div class="demo-body">
+          <div class="stepbar" id="d2Steps"></div>
+          <div id="d2Stage"></div>
+          <div class="ctrl-row" style="margin-top:18px">
+            <button class="primary" id="d2Next">下一步 →</button>
+            <button id="d2Back">← 上一步</button>
+            <button id="d2Reset">重置</button>
+            <label style="margin-left:auto;font-size:13px;color:var(--ink-soft);display:flex;align-items:center;gap:7px;cursor:pointer">
+              <input type="checkbox" id="d2Mask" style="width:auto"> 只看前文（加因果掩码）
+            </label>
+          </div>
+          <p class="hint" id="d2Hint"></p>
+        </div>
+      </div>
+
+      <div class="prose">
+        <p>四步对应四个问题：</p>
+        <ol>
+          <li><strong>打分</strong> <code>QK<sup>T</sup></code>：每个 Q 和每个 K 做点积，得到一个 n×n 的"相关度"表（n 是词的个数）。</li>
+          <li><strong>缩放</strong> <code>÷ √d<sub>k</sub></code>：把分数调回合适的量级，防止后面 softmax "太极端"（第 06 节细讲）。</li>
+          <li><strong>归一化</strong> <code>softmax</code>：每一行转成概率，加起来等于 1——这就是"注意力分配比例"。</li>
+          <li><strong>加权求和</strong> <code>× V</code>：按比例把各词的 Value 混合，得到每个词的新表示。</li>
+        </ol>
+        <p>你会发现：<strong>整条链里没有任何循环、没有任何"下一步依赖上一步"</strong>。所有词的所有运算都能同时进行——这就是它能吃满 GPU 的原因。</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="s5">
+      <div class="ch-head"><span class="ch-num">05</span><h2 class="ch-title">中间的枢纽：Softmax 到底做了什么</h2></div>
+      <div class="prose">
+        <p class="lede">Softmax 是一个"把一堆任意实数变成一组合法概率"的函数。给一组分数 <code>z₁, z₂, …</code>，它对每个分数做指数运算再除以总和：</p>
+        <div class="formula">
+          <div class="fname">Softmax</div>
+          <div class="eq">
+            softmax(z)<sub>i</sub> <span class="op">=</span>
+            <span class="frac"><span class="top">e<sup>z<sub>i</sub></sup></span><span class="bot">Σ<sub>j</sub> e<sup>z<sub>j</sub></sup></span></span>
+          </div>
+          <div class="gloss">输出恒为正、且全部加起来等于 1。分数越高，占比越大；而且它对"大分数"特别偏心（指数放大）。</div>
+        </div>
+        <p>拖动下面的滑块改变每个分数，看概率（条形）怎么变。注意一个规律：<strong>把某个分数抬高，它吃掉的注意力会不成比例地增加</strong>；分数之间差得越多，分布越"尖"（越专注）。</p>
+      </div>
+
+      <div class="demo">
+        <div class="demo-head"><span class="t">动手 03 · 拨动分数，看注意力怎么变尖</span></div>
+        <div class="demo-body">
+          <div id="smSliders"></div>
+          <div class="bars" id="smBars" style="margin-top:18px"></div>
+          <p class="hint">每行左边是原始分数，右边是 softmax 后的概率。试着把"乙"拉高到 5，再拉到 10，感受分布从"平均"到"押注"的变化。</p>
+        </div>
+      </div>
+
+      <div class="prose">
+        <p>一个反直觉但重要的事实：<strong>softmax 只关心分数之间的<em>相对差距</em></strong>。把所有分数同时加 100，输出完全不变。所以真正决定"注意力多集中"的，是这些分数的<em>差距大小</em>——这也正是第 06 节"为什么要缩放"的关键。</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="s6">
+      <div class="ch-head"><span class="ch-num">06</span><h2 class="ch-title">为什么偏偏除以 √d<sub>k</sub></h2></div>
+      <div class="prose">
+        <p class="lede">这是全篇最容易被跳过、却最能体现设计巧思的一步。为什么不是除以 d<sub>k</sub>、不是除以 2，而是 <strong>√d<sub>k</sub></strong>？答案藏在一个概率论事实里。</p>
+        <p>假设 Q 和 K 里每个分量都是均值为 0、方差为 1 的独立随机数。那么一个长度为 d<sub>k</sub> 的向量做点积 <code>q·k = Σ q<sub>i</sub>k<sub>i</sub></code>，它的<strong>方差是 d<sub>k</sub></strong>，标准差是 √d<sub>k</sub>。</p>
+        <p>这意味着：<strong>维度越高，点积的值就越"大起大落"</strong>。d<sub>k</sub>=64 时，分数很容易冲到 ±8 甚至更大。而 softmax 讨厌大数值——分数一大，它的输出就变成"差不多 0 和一个 1"，也就是<strong>饱和</strong>。饱和的 softmax 梯度接近 0，模型几乎学不动。</p>
+        <p>把点积除以 √d<sub>k</sub>，正好把方差拉回到 1，分数重新落在舒服的区间，softmax 就不会过早"押死"，梯度也就保住了。</p>
+        <div class="note warn">
+          <span class="tag">划重点</span>
+          <p>除以 √d<sub>k</sub> 不是为了改变结果，而是为了让<strong>训练更稳、梯度更健康</strong>。这是"缩放"二字的全部意义。</p>
+        </div>
+      </div>
+
+      <div class="demo">
+        <div class="demo-head">
+          <span class="t">动手 04 · 不缩放会怎样</span>
+          <div class="ctrl-row">
+            <span style="font-size:13px;color:var(--ink-soft);font-family:var(--mono)">d<sub>k</sub> = <b id="dkVal">8</b></span>
+            <input type="range" id="dkRange" min="1" max="256" value="8" step="1" style="width:150px">
+          </div>
+        </div>
+        <div class="demo-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px" id="scaleGrid">
+            <div>
+              <p class="mat-label" style="color:var(--signal)">❌ 不缩放 softmax(QK<sup>T</sup>)</p>
+              <div class="bars" id="unscaledBars"></div>
+            </div>
+            <div>
+              <p class="mat-label" style="color:var(--good)">✅ 缩放 softmax(QK<sup>T</sup> / √d<sub>k</sub>)</p>
+              <div class="bars" id="scaledBars"></div>
+            </div>
+          </div>
+          <p class="hint">同一组词、同一个"最相关"的词。维度越高，不缩放的分布越是"全押在一个词上"（其它几乎为 0），梯度随之消失；缩放后始终保持合理的软硬程度。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="s7">
+      <div class="ch-head"><span class="ch-num">07</span><h2 class="ch-title">多头注意力：同时戴着好几副眼镜看</h2></div>
+      <div class="prose">
+        <p class="lede">如果只做一次注意力，模型只能学出<strong>一种</strong>"该关注谁"的角度。但语言里的关系是多样的：有的关系看语法（主语↔动词），有的看指代（代词↔先行词），有的看语义搭配。</p>
+        <p>解决方案：<strong>并行做很多次注意力，每次用自己的一套 W<sup>Q</sup>、W<sup>K</sup>、W<sup>V</sup></strong>。这每一次就叫一个"头"（head）。论文里用了 <strong>8 个头</strong>，每个头把 512 维切成 64 维来做（512 = 8 × 64），最后把 8 个头的结果拼接起来，再乘一个 W<sup>O</sup> 融合。</p>
+        <div class="formula">
+          <div class="fname">Multi-Head Attention · 多头注意力</div>
+          <div class="eq">
+            head<sub>i</sub> <span class="op">=</span> Attention(Q W<sub>i</sub><sup>Q</sup>, K W<sub>i</sub><sup>K</sup>, V W<sub>i</sub><sup>V</sup>)
+          </div>
+          <div class="eq" style="margin-top:8px">
+            MultiHead <span class="op">=</span> Concat(head<sub>1</sub>, …, head<sub>8</sub>) W<sup>O</sup>
+          </div>
+          <div class="gloss">每个头独立算一套注意力，最后拼接 + 线性融合。"分工"是为了一起看清不同类型的关系。</div>
+        </div>
+        <p>关键洞察：<strong>切开维度做多头，总计算量几乎不变</strong>（512 维做一次 ≈ 8 个 64 维各做一次）。所以这不是"更贵"，而是"更划算"——同样的算力，换来多个观察视角。</p>
+      </div>
+
+      <div class="demo">
+        <div class="demo-head">
+          <span class="t">动手 05 · 同句话，不同头看到的关系不同</span>
+          <div class="ctrl-row">
+            <div class="seg" id="mhHeads"></div>
+            <button id="mhAll" class="ghost">看全部 →</button>
+          </div>
+        </div>
+        <div class="demo-body">
+          <div id="mhStage"></div>
+          <p class="hint">这是教学化的示意（真实模型里每个头学到的分工是训练中自发涌现的，不同层、不同任务都不一样）。点"看全部"对比多个头。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="s8">
+      <div class="ch-head"><span class="ch-num">08</span><h2 class="ch-title">位置编码：注意力没有"顺序"概念</h2></div>
+      <div class="prose">
+        <p class="lede">这是自注意力一个致命的天生缺陷：它把一句话当成<strong>一堆词的集合</strong>，对顺序完全不敏感。"猫追老鼠"和"老鼠追猫"在它眼里提供的词完全一样，注意力权重也一模一样。</p>
+        <p>可顺序明明很重要。于是论文给每个词的向量<strong>加上</strong>一个只和"位置"有关的向量——位置编码（Positional Encoding）。这样第 1 个位置的向量和第 5 个位置的向量，即使词一样，也会带上不同的"时间戳"信息。</p>
+        <div class="formula">
+          <div class="fname">Sinusoidal Positional Encoding · 正弦位置编码</div>
+          <div class="eq">PE(pos, 2i) &nbsp;<span class="op">=</span>&nbsp; sin( pos / 10000<sup>2i/d<sub>model</sub></sup> )</div>
+          <div class="eq" style="margin-top:6px">PE(pos, 2i+1) <span class="op">=</span>&nbsp; cos( pos / 10000<sup>2i/d<sub>model</sub></sup> )</div>
+          <div class="gloss">pos 是位置，i 是维度序号。偶数维用 sin、奇数维用 cos，不同维度对应不同频率——像给每个位置发了一组独特的"收音机频道"。</div>
+        </div>
+        <p>为什么用 sin/cos，而不是简单地编号 0、1、2、3？三个理由：</p>
+        <ul>
+          <li><strong>相对位置可推导</strong>：位置 <code>pos+k</code> 的编码可以由位置 <code>pos</code> 的编码通过一个固定的线性变换得到。模型因此容易学会"相差 k 步"这种<em>相对</em>关系。</li>
+          <li><strong>值域稳定</strong>：sin/cos 永远在 [-1,1]，不会像 0,1,2,…,5000 那样越编越大、压过词义。</li>
+          <li><strong>能外推一点</strong>：不同频率的正弦叠加，让模型对训练时没见过的、稍长的句子也有一定的处理能力。</li>
+        </ul>
+      </div>
+
+      <div class="demo">
+        <div class="demo-head">
+          <span class="t">动手 06 · 位置编码长什么样</span>
+          <div class="ctrl-row">
+            <span style="font-size:13px;color:var(--ink-soft);font-family:var(--mono)">把鼠标放到图上，看某个位置的"频道指纹"</span>
+          </div>
+        </div>
+        <div class="demo-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px" id="peGrid">
+            <div>
+              <p class="mat-label">位置 × 维度 的热力图（越暖＝正值越大，越青＝负值）</p>
+              <canvas id="peHeat" width="360" height="300" style="width:100%;height:auto"></canvas>
+            </div>
+            <div>
+              <p class="mat-label">前 5 个维度的正弦波（横轴＝位置）</p>
+              <canvas id="peCurve" width="360" height="300" style="width:100%;height:auto"></canvas>
+            </div>
+          </div>
+          <p class="hint">左边每一<strong>行</strong>是一个位置的编码：低维（左侧）变化快，高维（右侧）变化慢。右边每条彩线对应一个维度，波长不同——正是这些不同快慢的波，让每个位置拥有独一无二的组合。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="s9">
+      <div class="ch-head"><span class="ch-num">09</span><h2 class="ch-title">整体架构：编码器 × 6 与解码器 × 6</h2></div>
+      <div class="prose">
+        <p class="lede">把零件拼起来，Transformer 是一台"翻译机器"：左边把源语言句子<strong>读懂</strong>（编码器），右边把意思<strong>逐词写出来</strong>（解码器）。两者各由 <strong>6 层完全相同的模块</strong>堆叠而成。</p>
+        <p>先看两种模块长什么样。</p>
+      </div>
+
+      <div class="arch">
+        <div class="arch-col">
+          <div class="hd">编码器层 Encoder × 6</div>
+          <div class="block att">多头自注意力<span class="sub">每个词看整句话的所有词</span></div>
+          <div class="between">↓ 残差 + LayerNorm</div>
+          <div class="block ffn">前馈网络 FFN<span class="sub">对每个位置独立作用的两层 MLP</span></div>
+          <div class="between">↓ 残差 + LayerNorm</div>
+          <div class="block norm">输出给上一层 / 也给解码器</div>
+        </div>
+        <div class="arch-col">
+          <div class="hd">解码器层 Decoder × 6</div>
+          <div class="block att-mask">带掩码的多头自注意力<span class="sub">只能看已生成的词，不许偷看未来</span></div>
+          <div class="between">↓ 残差 + LayerNorm</div>
+          <div class="block cross">编码器-解码器注意力（交叉）<span class="sub">Q 来自解码器，K、V 来自编码器输出</span></div>
+          <div class="between">↓ 残差 + LayerNorm</div>
+          <div class="block ffn">前馈网络 FFN<span class="sub">结构同上</span></div>
+          <div class="between">↓ 残差 + LayerNorm</div>
+          <div class="block norm">输出 → 线性层 → softmax → 下一个词</div>
+        </div>
+      </div>
+
+      <div class="prose">
+        <h3>三个"注意力层"别搞混</h3>
+        <p>Transformer 里有三种注意力，区别只在<strong>Q、K、V 分别来自哪儿</strong>：</p>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>名称</th><th>Query 来自</th><th>Key / Value 来自</th><th>作用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>编码器自注意力</strong></td><td>源句</td><td>源句</td><td>源句内部互相理解</td></tr>
+              <tr><td><strong>解码器掩码自注意力</strong></td><td>已生成的目标词</td><td>已生成的目标词</td><td>生成时不能看到未来</td></tr>
+              <tr><td><strong>交叉注意力</strong></td><td>解码器</td><td>编码器输出</td><td>把源句信息"读"进翻译</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>另外两个"配角"，其实很关键</h3>
+        <p><strong>残差连接（Residual）</strong>——每个子层的输入直接加到输出上（<code>x + Sublayer(x)</code>）。它给梯度开了一条"高速公路"，让 6 层甚至更深也能训得动。</p>
+        <p><strong>层归一化（LayerNorm）</strong>——把每个位置的向量重新缩放成均值 0、方差 1，防止数值在深层里"跑偏"。论文把 LayerNorm 放在子层之后（Post-Norm）。</p>
+        <p><strong>前馈网络（FFN）</strong>——两层全连接，中间夹 ReLU，维度先升到 2048 再降回 512。注意力负责"词与词之间交换信息"，FFN 负责"对每个词自己做加工"，两者互补。</p>
+        <div class="formula">
+          <div class="fname">Feed-Forward Network</div>
+          <div class="eq">FFN(x) <span class="op">=</span> max(0, x W<sub>1</sub> + b<sub>1</sub>) W<sub>2</sub> + b<sub>2</sub></div>
+          <div class="gloss">512 → 2048 → 512。逐位置独立作用，不含跨词交互。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="s10">
+      <div class="ch-head"><span class="ch-num">10</span><h2 class="ch-title">掩码：不许偷看答案</h2></div>
+      <div class="prose">
+        <p class="lede">解码器是<strong>一个一个词地生成</strong>输出的。当它要生成第 t 个词时，绝不能"看到"第 t+1 个词——否则就成了抄答案，训练时表现完美、实际用时抓瞎。</p>
+        <p>做法叫<strong>因果掩码（Causal Mask）</strong>：在 softmax 之前，把所有"未来位置"的分数设成 <strong>−∞</strong>。softmax 遇到 −∞ 输出正好是 0，于是这些位置彻底拿不到注意力。</p>
+      </div>
+
+      <div class="demo">
+        <div class="demo-head"><span class="t">动手 07 · 掩码把右上角"蒙住"</span></div>
+        <div class="demo-body">
+          <div id="maskViz"></div>
+          <p class="hint">灰色格子是被掩掉的位置（分数 −∞ → 概率 0）。第 1 个词只能看自己，第 2 个词能看前两个……于是每行只对左边和下三角有效，注意力矩阵变成一个"下三角"形状。</p>
+        </div>
+      </div>
+
+      <div class="prose">
+        <p>训练时用掩码可以<strong>一次性并行</strong>算出所有位置的预测（因为每个位置都不会看到它右边的内容），这是 Transformer 训练效率远高于 RNN 的原因之一。</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="s11">
+      <div class="ch-head"><span class="ch-num">11</span><h2 class="ch-title">训练细节速览（论文原参数）</h2></div>
+      <div class="prose">
+        <p class="lede">这些数字是复现和理解论文时最容易考到的，不用背，会查即可。</p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>超参数</th><th>取值</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td>d<sub>model</sub></td><td>512</td><td>每个词的向量宽度</td></tr>
+            <tr><td>N（层数）</td><td>6</td><td>编码器 / 解码器各 6 层</td></tr>
+            <tr><td>h（头数）</td><td>8</td><td>多头注意力的头数</td></tr>
+            <tr><td>d<sub>k</sub> = d<sub>v</sub></td><td>64</td><td>每个头的维度（512 ÷ 8）</td></tr>
+            <tr><td>d<sub>ff</sub></td><td>2048</td><td>FFN 中间层宽度</td></tr>
+            <tr><td>Dropout</td><td>0.1</td><td>防过拟合</td></tr>
+            <tr><td>优化器</td><td>Adam (β₁=0.9, β₂=0.98, ε=1e−9)</td><td>论文对 β₂、ε 做了特别调整</td></tr>
+            <tr><td>学习率策略</td><td>先 warmup 再衰减</td><td>先用 4000 步把学习率升上去，再按步数平方根衰减</td></tr>
+            <tr><td>标签平滑</td><td>ε<sub>ls</sub> = 0.1</td><td>让模型别过于自信，泛化更好</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose">
+        <div class="formula">
+          <div class="fname">Learning Rate Schedule</div>
+          <div class="eq">lr <span class="op">=</span> d<sub>model</sub><sup>−0.5</sup> · min( step<sup>−0.5</sup>, step · warmup<sup>−1.5</sup> )</div>
+          <div class="gloss">warmup = 4000 步。前期线性升温（避免一开始乱冲），后期随步数平方根下降。</div>
+        </div>
+        <p>还有一个值得知道的点：论文的注意力复杂度是 <strong>O(n² · d)</strong>——因为要算 n×n 的分数矩阵。这是 Transformer 面对超长文本时的瓶颈，也是后续一堆"高效注意力"研究（稀疏、线性、FlashAttention 等）的出发点。</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="s12">
+      <div class="ch-head"><span class="ch-num">12</span><h2 class="ch-title">它到底赢在哪：一张对比表</h2></div>
+      <div class="prose">
+        <p class="lede">论文用一整节（Table 1）比较了各层的复杂度、顺序计算量和最大路径长度。核心结论就三条。</p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>维度</th><th>RNN / LSTM</th><th>CNN</th><th>Transformer</th></tr></thead>
+          <tbody>
+            <tr><td>每层复杂度</td><td>O(n·d²)</td><td>O(k·n·d²)</td><td>O(n²·d)</td></tr>
+            <tr><td>能否并行（顺序操作数）</td><td><span class="no">O(n)，必须串行</span></td><td><span class="yes">O(1)</span></td><td><span class="yes">O(1)，全并行</span></td></tr>
+            <tr><td>两词间最大路径长度</td><td><span class="no">O(n)：越远越难学</span></td><td>O(log<sub>k</sub> n)</td><td><span class="yes">O(1)：任意两词直达</span></td></tr>
+            <tr><td>长依赖建模</td><td>弱（信息会衰减）</td><td>中</td><td><span class="yes">强</span></td></tr>
+            <tr><td>超长序列</td><td>尚可</td><td>尚可</td><td><span class="no">吃力（n² 爆炸）</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose">
+        <p>一句话总结这张表：<strong>Transformer 用"更高的复杂度上限"换来了"完全并行 + 任意两词一步直达"</strong>。在 GPU 时代，前者的代价可以忍，后者的收益是决定性的。它还有一个隐藏优势：可解释性——注意力权重能直接画成热力图，你能看到模型"在看哪"。</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="s13">
+      <div class="ch-head"><span class="ch-num">13</span><h2 class="ch-title">概念分析题（点开看解析）</h2></div>
+      <div class="prose">
+        <p class="lede">下面 12 道题都只考"为什么"，不考背诵。建议先自己想一遍，再点开对照。能顺畅答完，说明你真的搞懂了。</p>
+      </div>
+
+      <div class="qa" id="qaBox">
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q1</span><span>Transformer 为什么抛弃 RNN 的循环结构？这样做又付出了什么代价？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p><strong>收益</strong>：① 彻底并行——所有位置同时计算，不再依赖前一步，能喂满 GPU；② 路径短——任意两个词之间只需 1 步就能交换信息，长距离依赖极易学到；③ 不受序列长度影响的计算深度。</p>
+            <p><strong>代价</strong>：① 复杂度从 O(n·d²) 变成 O(n²·d)，序列越长，n×n 的注意力矩阵越大，长文本会爆内存；② 天生没有顺序概念，必须额外加位置编码；③ 单层感受野是全局的，缺少 RNN 那种天然的归纳偏置，因此需要更多数据。这就是后续"高效注意力"研究要解决的问题。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q2</span><span>为什么要除以 √d<sub>k</sub>？如果改成"不除"或者"除以 d<sub>k</sub>"会怎样？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>点积 q·k 的方差随维度 d<sub>k</sub> 线性增长，标准差是 √d<sub>k</sub>。维度越高，分数数值越大越极端，softmax 会<strong>饱和</strong>（输出趋近独热向量），梯度趋近 0，训练停滞。</p>
+            <p><strong>不除</strong>：高维时训练不稳定、难收敛（这是论文原文的实验依据）。<strong>除以 d<sub>k</sub></strong>：会过度缩小分数，让 softmax 输出过于均匀（接近平均分配），注意力失去"分辨力"，损失函数也变差。<strong>除以 √d<sub>k</sub></strong> 恰好把方差拉回 1，两头兼顾——这是从"方差 = 1"这个目标反推出来的唯一自然选择。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q3</span><span>为什么要用多头注意力，而不是用一个"头更大、维度更高"的注意力？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>单个注意力只能输出<strong>一种</strong>关注模式（一个 n×n 权重矩阵）。但一句话里同时存在多种关系：语法依存、指代、语义搭配……多头让模型<strong>并行地从多个子空间观察</strong>，每头专注一类关系，再拼接融合。</p>
+            <p>关键在于"划算"：把 512 维<strong>切</strong>成 8 个 64 维做多头，总参数量和计算量几乎和做一次 512 维注意力相同，却换来了多视角。所以这不是拿更多算力换效果，而是"同样的算力，拆成多份用"。（注意：把 512 维整体做一次注意力，和做 8 个 64 维的注意力，不是同一件事——维度被切分后每个头只能看子空间。）</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q4</span><span>位置编码为什么用 sin/cos，而不用简单的 0、1、2、3…？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>三个原因：① <strong>相对位置可线性表示</strong>——PE(pos+k) 能由 PE(pos) 经固定线性变换得到，模型容易学"相差 k 步"这种相对关系；② <strong>值域有界</strong>——sin/cos 恒在 [−1,1]，而 0,1,2,…,5000 这种编号会随位置线性增大，量级盖过词义向量，破坏加法的平衡；③ <strong>有界外推</strong>——不同频率的正弦叠加，使模型对训练未见过的稍长序列仍有一定泛化。</p>
+            <p>一句话：sin/cos 让"位置"既有辨识度，又是稳定的、可做相对运算的信号。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q5</span><span>解码器里的"掩码自注意力"和"交叉注意力"有什么本质区别？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>区别在 <strong>Q、K、V 的来源</strong>。掩码自注意力：Q、K、V 全部来自解码器<em>已经生成</em>的目标序列，并且加因果掩码，防止看到未来。<strong>交叉注意力</strong>：Query 来自解码器当前状态，而 Key、Value 来自<strong>编码器对源句的输出</strong>——它让解码器在写每个目标词时，回头去"读"源句里最相关的部分。</p>
+            <p>直观上：自注意力是"目标句内部理清逻辑"，交叉注意力是"把源句的译文依据读进来"。这是机器翻译里"对齐"的现代实现。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q6</span><span>如果没有因果掩码，训练会出什么问题？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>训练时解码器是"每个位置同时预测下一个词"。若不加掩码，预测第 t 个词时它能直接看到第 t+1、t+2…这些真实答案，于是<strong>抄答案</strong>：训练损失极低，但推理时未来词并不存在，模型立即崩溃。这叫"信息泄漏"。</p>
+            <p>因果掩码在 softmax 前把未来位置置为 −∞，输出 0，既杜绝了泄漏，又保留了"一次并行算完所有位置"的效率——两全其美。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q7</span><span>残差连接和 LayerNorm 在 Transformer 里各解决什么问题？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p><strong>残差连接</strong> <code>x + Sublayer(x)</code>：给梯度和原始信息开一条"捷径"，使 6 层乃至上百层能稳定训练，缓解梯度消失；也让每一层只需学"增量修正"。</p>
+            <p><strong>LayerNorm</strong>：把每个位置的向量重新归一化（均值 0、方差 1）再缩放平移，稳定各层激活的数值分布，防止深层里数值爆炸或坍缩。注意它按"单个样本、跨特征维"做，和 BatchNorm 按 batch 维做不同——这使它不依赖 batch 大小，适合变长序列。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q8</span><span>W<sup>Q</sup>、W<sup>K</sup>、W<sup>V</sup> 三个投影矩阵各起什么作用？能不能三者共用一个？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>W<sup>Q</sup> 决定"我拿什么去查"，W<sup>K</sup> 决定"我以什么身份被查"，W<sup>V</sup> 决定"被匹配上后我贡献什么内容"。三者承担的任务不同，需要<strong>独立的可学习参数</strong>，模型才能分别优化"怎么匹配"和"取出什么"。</p>
+            <p>如果共用一个矩阵，Q 和 K 就被绑死在同一空间里，匹配方式失去自由度（相当于强制自相似），表达能力明显下降。实践中三者都是分开的，各自有独立的权重。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q9</span><span>FFN（前馈网络）在注意力之后到底起什么作用？是不是可有可无？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>不可无。注意力负责<strong>词与词之间交换信息</strong>（对每个位置，它是其它位置 V 的加权和，本质是"线性混合"）。但加权和本身表达能力有限，缺少非线性。FFN 对<strong>每个位置独立</strong>地过一遍"升维→ReLU→降维"，引入非线性变换，让模型能对汇拢来的信息做更复杂的加工。</p>
+            <p>可以理解为：注意力负责"通信"，FFN 负责"计算"。研究还发现 FFN 层像一个"键值记忆库"，存储了大量事实知识。移除 FFN 会让模型能力大幅下降。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q10</span><span>为什么说自注意力对"词序"不敏感？请设一个反例说明没有位置编码会出错。</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>自注意力的输出是"各位置 V 的加权和"，而权重由 Q·K 决定；把句子里的词<strong>重新排列</strong>，每个词与其它词的匹配集合相同（只是换了行序），结果只是相应地重新排列，语义判断不会变。也就是说它把句子当成"词袋"，而非有序序列。</p>
+            <p>反例："狗咬人"和"人咬狗"。没有位置编码，两句话给模型的输入信息完全一样（同样的词、同样的两两关系），模型无法区分谁是主语、谁是宾语，翻译或理解必然出错。位置编码正是在向量里注入"谁在前、谁在后"的信息来修复这一点。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q11</span><span>为什么自注意力的计算复杂度是 O(n²·d)？这个问题后来怎么被缓解？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p>因为要对<strong>每一对词</strong>算一个匹配分数：n 个词 × n 个词 = n² 个分数，每个分数是一个 d 维点积（O(d)），所以是 O(n²·d)；同时要存 n×n 的注意力矩阵，空间也是 O(n²)。序列一长，平方增长会撑爆显存。</p>
+            <p>缓解方向：<strong>稀疏/局部注意力</strong>（每词只看附近或少量关键位置）、<strong>线性注意力</strong>（用核函数改写，降到 O(n·d²)）、<strong>FlashAttention</strong>（不改变数学，靠分块和显存优化把实际速度提上来）。这些都是 Transformer 之后的重要研究分支。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">Q12</span><span>【综合案例】某公司要把一批中文合同机器翻译成英文，句子很长且含大量专业术语。有人建议改用纯 RNN。结合本文，你会怎么分析和建议？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解析</span>
+            <p><strong>先看需求</strong>：① 长句 → 需要强的长距离依赖建模；② 术语要对齐 → 需要"源句↔译文"的显式对齐能力；③ 可能数据量有限 → 需要能利用预训练。</p>
+            <p><strong>逐条对照</strong>：RNN 串行、长依赖会衰减，长句术语容易"跑偏"，且无法并行、训练慢——<em>不合适</em>。Transformer 任意两词一步直达、交叉注意力天然做"对齐"，而且当今主流的预训练翻译模型（如各种 NMT、LLM）都建立在 Transformer 上，可直接迁移微调——<em>更合适</em>。</p>
+            <p><strong>潜在风险与对策</strong>：合同句子若极长，O(n²) 可能吃紧 → 可用长上下文优化（FlashAttention）、分句/分段 + 术语表约束、或稀疏注意力。结论：<strong>选 Transformer 架构</strong>，用预训练模型微调，并针对长文本和术语做工程优化；纯 RNN 不建议。</p>
+          </div></div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="chapter" id="s14">
+      <div class="ch-head"><span class="ch-num">14</span><h2 class="ch-title">动手算几道（附详细解答）</h2></div>
+      <div class="prose">
+        <p class="lede">概念之外，亲手算一遍就再也不会忘。下面 4 道从易到难，答案可以展开对照。</p>
+      </div>
+
+      <div class="qa" id="qaCalc">
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">C1</span><span>给三个分数 z = [2, 1, 0]，求 softmax。再问：整体减去 1 变成 [1, 0, −1]，结果变吗？</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解答</span>
+            <p>先算指数：e² ≈ 7.389，e¹ ≈ 2.718，e⁰ = 1，和 ≈ 11.107。</p>
+            <p>softmax = [7.389/11.107, 2.718/11.107, 1/11.107] ≈ <strong>[0.665, 0.245, 0.090]</strong>（加起来为 1）。</p>
+            <p>减去常数后：e¹≈2.718，e⁰=1，e⁻¹≈0.368，和≈4.086。结果 = [2.718/4.086, 1/4.086, 0.368/4.086] ≈ <strong>[0.665, 0.245, 0.090]</strong>——<strong>完全一样</strong>。这验证了 softmax 的"平移不变性"：只看分数之间的差距。这也是实现里会先减去最大值（数值稳定技巧）的理论依据。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">C2</span><span>一个词向量 q = [1, 0]，两个词的 k₁ = [1, 0]、k₂ = [0, 1]，d<sub>k</sub> = 2。算缩放前后的注意力权重，并解释差别。</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解答</span>
+            <p>点积：q·k₁ = 1×1 + 0×0 = 1；q·k₂ = 1×0 + 0×1 = 0。分数 = [1, 0]。</p>
+            <p><strong>不缩放</strong>：softmax([1,0]) = [e/(e+1), 1/(e+1)] ≈ [0.731, 0.269]。<br>
+            <strong>缩放</strong>（÷√2 ≈ 1.414）：分数 = [0.707, 0]，softmax ≈ [e<sup>0.707</sup>/(e<sup>0.707</sup>+1), …] ≈ <strong>[0.670, 0.330]</strong>。</p>
+            <p>缩放让分布更"平缓"，弱化了对 k₁ 的过度聚焦。当 d<sub>k</sub> 更大时（比如 64），不缩放的差别会被指数放大到极端——这正是缩放的用武之地。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">C3</span><span>论文基础模型：d<sub>model</sub>=512，h=8，d<sub>ff</sub>=2048。求（a）每个头的维度 d<sub>k</sub>；（b）一个 FFN 子层的参数量（含偏置）；（c）为什么多头切分后总计算量基本不变。</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解答</span>
+            <p><strong>(a)</strong> d<sub>k</sub> = d<sub>model</sub> / h = 512 / 8 = <strong>64</strong>。</p>
+            <p><strong>(b)</strong> FFN = 线性(512→2048) + 线性(2048→512)。参数 = (512×2048 + 2048) + (2048×512 + 512) = 1,048,576+2,048 + 1,048,576+512 = <strong>2,099,712</strong> ≈ 2.1M。</p>
+            <p><strong>(c)</strong> 一次 d<sub>model</sub> 维注意力，QK<sup>T</sup> 的成本约 n²·d<sub>model</sub>；8 个 d<sub>k</sub>=64 的头，QK<sup>T</sup> 合计 8 × n²·64 = n²·512 = n²·d<sub>model</sub>——相等。投影矩阵总参数也为 8×(d<sub>model</sub>×d<sub>k</sub>) = d<sub>model</sub>²，同样相等。所以多头是"同算力换多视角"。</p>
+          </div></div>
+        </div>
+
+        <div class="qa-item">
+          <button class="qa-q"><span class="qn">C4</span><span>用论文的位置编码公式算 d<sub>model</sub>=4 时，位置 pos=0 和 pos=1 的编码向量（保留 2 位小数）。</span><span class="chev">＋</span></button>
+          <div class="qa-a"><div class="qa-a-inner">
+            <span class="ans-tag">解答</span>
+            <p>d<sub>model</sub>=4，维度 index 2i = 0,2；分母 10000<sup>2i/4</sup> = 10000<sup>i/2</sup>：i=0 → 10000⁰ = 1；i=1 → 10000<sup>0.5</sup> = 100。</p>
+            <p>pos=0：sin(0/1)=0，cos(0/1)=1，sin(0/100)=0，cos(0/100)=1 → <strong>[0.00, 1.00, 0.00, 1.00]</strong>。</p>
+            <p>pos=1：sin(1/1)=0.841，cos(1/1)=0.540，sin(1/100)=0.010，cos(1/100)=0.999 → <strong>[0.84, 0.54, 0.01, 1.00]</strong>。</p>
+            <p>可以看到：<strong>低维（左侧）变化快、高维（右侧）变化慢</strong>。位置 0 和 1 在高维上几乎相同，靠低维拉开区分——这正是"多频率"设计的直观体现。</p>
+          </div></div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="chapter" id="s15">
+      <div class="ch-head"><span class="ch-num">15</span><h2 class="ch-title">一页速查表</h2></div>
+      <div class="prose">
+        <p class="lede">考前一分钟扫一眼。</p>
+        <div class="formula">
+          <div class="fname">四个必记公式</div>
+          <div class="eq" style="white-space:normal">Attention(Q,K,V) = softmax(QK<sup>T</sup>/√d<sub>k</sub>) V</div>
+          <div class="eq" style="margin-top:8px;white-space:normal">MultiHead = Concat(head<sub>1</sub>…head<sub>h</sub>) W<sup>O</sup>，head<sub>i</sub>=Attention(QW<sub>i</sub><sup>Q</sup>,KW<sub>i</sub><sup>K</sup>,VW<sub>i</sub><sup>V</sup>)</div>
+          <div class="eq" style="margin-top:8px;white-space:normal">FFN(x) = max(0, xW<sub>1</sub>+b<sub>1</sub>)W<sub>2</sub>+b<sub>2</sub></div>
+          <div class="eq" style="margin-top:8px;white-space:normal">PE(pos,2i)=sin(pos/10000<sup>2i/d</sup>)，PE(pos,2i+1)=cos(pos/10000<sup>2i/d</sup>)</div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>关键词</th><th>一句话记住</th></tr></thead>
+            <tbody>
+              <tr><td>自注意力</td><td>每个词按相关度加权融合所有词的信息</td></tr>
+              <tr><td>Q / K / V</td><td>我想查什么 / 我凭什么被查 / 我贡献什么内容</td></tr>
+              <tr><td>√d<sub>k</sub> 缩放</td><td>把点积方差压回 1，防止 softmax 饱和</td></tr>
+              <tr><td>多头</td><td>同算力、多视角，各自学一类关系</td></tr>
+              <tr><td>位置编码</td><td>补上自注意力丢掉的"词序"</td></tr>
+              <tr><td>残差 + LayerNorm</td><td>让深层网络训得动、数值稳</td></tr>
+              <tr><td>因果掩码</td><td>生成时不许偷看未来（设 −∞→概率 0）</td></tr>
+              <tr><td>核心优势</td><td>全并行 + 任意两词一步直达</td></tr>
+              <tr><td>核心代价</td><td>O(n²) 复杂度，长文本吃紧</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note good">
+          <span class="tag">下一步学什么</span>
+          <p>搞懂这篇论文后，很自然的方向是：BERT（只用编码器，双向理解）、GPT（只用解码器，自回归生成）、以及视觉 Transformer（ViT）。它们的骨架，就是你现在理解的这些东西。</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="f-inner">
+    <b>Attention Is All You Need</b> · Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin（2017, NeurIPS）。<br>
+    本页为面向初学者的交互式导读，数值均为教学用小例子，非论文原始数据。公式以论文为准。
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  const reduceMotion=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- colormap: cool -> warm ---------- */
+  const STOPS=[[0.0,[236,246,246]],[0.38,[140,209,204]],[0.70,[242,178,62]],[1.0,[226,62,87]]];
+  function cmapRGB(t){t=clamp(t,0,1);for(let i=0;i<STOPS.length-1;i++){const a=STOPS[i][0],ca=STOPS[i][1],b=STOPS[i+1][0],cb=STOPS[i+1][1];if(t>=a&&t<=b){const f=(b-a)?(t-a)/(b-a):0;return [Math.round(ca[0]+(cb[0]-ca[0])*f),Math.round(ca[1]+(cb[1]-ca[1])*f),Math.round(ca[2]+(cb[2]-ca[2])*f)];}}return [226,62,87];}
+  function cmapCss(t){const c=cmapRGB(t);return `rgb(${c[0]},${c[1]},${c[2]})`;}
+  function inkOn(t){return t>0.56?'#fff':'#0E1A32';}
+
+  /* ---------- math ---------- */
+  function softmaxRow(a){let m=-Infinity;for(const x of a)if(x>m)m=x;if(m===-Infinity)m=0;const e=a.map(x=>isFinite(x)?Math.exp(x-m):0);const s=e.reduce((p,c)=>p+c,0)||1;return e.map(x=>x/s);}
+  function matT(A){return A[0].map((_,j)=>A.map(r=>r[j]));}
+  function matMul(A,B){const n=A.length,m=B[0].length,k=B.length,C=[];for(let i=0;i<n;i++){C.push([]);for(let j=0;j<m;j++){let s=0;for(let t=0;t<k;t++)s+=A[i][t]*B[t][j];C[i].push(s);}}return C;}
+  function rowSoftmax(A){return A.map(r=>softmaxRow(r));}
+  function fmt(x,d=2){if(!isFinite(x))return "−∞";return x.toFixed(d);}
+  function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+  /* raw score matrix (before softmax) */
+  function scoreMatrix(n,rel,{self=1.2,def=0.3}={}){
+    const S=[];for(let i=0;i<n;i++)S.push(new Array(n).fill(def));
+    for(let i=0;i<n;i++)S[i][i]=self;
+    rel.forEach(([a,b,w])=>{if(a<n&&b<n)S[a][b]=Math.max(S[a][b],w);});
+    return S;
+  }
+  function buildAttn(n,rel,opts){return rowSoftmax(scoreMatrix(n,rel,opts));}
+
+  /* HTML heat grid */
+  function heatHTML(M,opts={}){
+    const {rows=[],cols=rows,cell=44,denom=null,showVal=true,dec=2,plain=false,font=11.5}=opts;
+    const n=M.length,m=M[0].length;
+    let max=denom; if(max==null){max=1e-9;M.forEach(r=>r.forEach(v=>{if(isFinite(v))max=Math.max(max,v)}));}
+    let h=`<div style="display:grid;grid-template-columns:${rows.length?Math.max(38,cell)+'px ':' '}repeat(${m},${cell}px);gap:3px;align-items:center;justify-content:start;font-family:var(--mono)">`;
+    if(cols.length){h+='<div></div>';for(let j=0;j<m;j++)h+=`<div style="text-align:center;color:var(--ink-faint);font-size:10px;max-width:${cell}px;overflow:hidden;white-space:nowrap">${esc(cols[j]||'')}</div>`;}
+    for(let i=0;i<n;i++){
+      if(rows.length)h+=`<div style="text-align:right;padding-right:6px;color:var(--ink-soft);font-size:10.5px;white-space:nowrap;overflow:hidden">${esc(rows[i]||'')}</div>`;
+      for(let j=0;j<m;j++){
+        const v=M[i][j];const t=plain?0:Math.max(0,(isFinite(v)?v:-1e9))/max;
+        const bg=plain?'#fff':cmapCss(t);const fg=plain?'#0E1A32':(isFinite(v)?inkOn(t):'#8A94AC');
+        h+=`<div style="height:${cell}px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:${bg};color:${fg};border:1px solid rgba(14,26,50,.07);font-size:${font}px">${showVal?esc(fmt(v,dec)):''}</div>`;
+      }
+    }
+    return h+'</div>';
+  }
+
+  /* ================= TOC scroll-spy ================= */
+  (function(){
+    const links=$$('#toc a');
+    const map={};links.forEach(a=>map[a.getAttribute('href').slice(1)]=a);
+    const secs=$$('main.doc section.chapter');
+    const io=new IntersectionObserver((ents)=>{
+      ents.forEach(e=>{
+        if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));const a=map[e.target.id];if(a){a.classList.add('active');}}
+      });
+    },{rootMargin:'-20% 0px -70% 0px',threshold:0});
+    secs.forEach(s=>io.observe(s));
+  })();
+
+  /* ================= accordion ================= */
+  $$('.qa-item').forEach(item=>{
+    const q=$('.qa-q',item),a=$('.qa-a',item);
+    q.addEventListener('click',()=>{
+      const open=item.classList.toggle('open');
+      a.style.maxHeight=open?(a.scrollHeight+40)+'px':'0px';
+    });
+  });
+
+  /* ================= HERO heatmap ================= */
+  (function(){
+    const host=$('#heroHeat');if(!host)return;
+    const tk=['Attention','is','all','you','need'];
+    const n=tk.length;
+    const target=buildAttn(n,[[0,3,3],[3,0,3],[4,0,3],[1,2,3],[0,1,2],[2,3,2],[3,4,2]],{self:1.6,def:0.35});
+    const cell=54;
+    let h=`<div style="display:grid;grid-template-columns:74px repeat(${n},${cell}px);gap:4px;align-items:center;font-family:var(--mono)">`;
+    h+='<div></div>';
+    for(let j=0;j<n;j++)h+=`<div style="text-align:center;color:var(--ink-faint);font-size:10px;overflow:hidden;white-space:nowrap">${tk[j]}</div>`;
+    const cells=[];
+    for(let i=0;i<n;i++){
+      h+=`<div style="text-align:right;padding-right:8px;color:var(--ink-soft);font-size:11px;white-space:nowrap">${tk[i]}</div>`;
+      for(let j=0;j<n;j++){
+        h+=`<div data-i="${i}" data-j="${j}" style="height:${cell}px;border-radius:6px;background:#E8EEF6;border:1px solid rgba(14,26,50,.08);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;transition:background .5s ease"></div>`;
+      }
+    }
+    host.innerHTML=h+'</div>';
+    const divs=$$('[data-i]',host);
+    function paint(withVal){
+      divs.forEach(d=>{
+        const v=target[+d.dataset.i][+d.dataset.j];
+        const t=Math.max(0,v)/Math.max(...target.flat());
+        d.style.background=cmapCss(t);
+        d.style.color=inkOn(t);
+        d.textContent=withVal?fmt(v,2):'';
+      });
+    }
+    if(reduceMotion){paint(true);return;}
+    // animate: random -> target
+    divs.forEach(d=>{const r=Math.random()*0.7;d.style.background=cmapCss(r);});
+    setTimeout(()=>{paint(true);},240);
+  })();
+
+  /* ================= DEMO 01: sentence attention ================= */
+  (function(){
+    const viz=$('#sentViz');if(!viz)return;
+    const SENTS=[
+      {tokens:['小猫','蹲在','垫子','上','，','因为','它','累了'],
+       rel:[[6,0,6],[6,2,3],[6,1,2],[0,1,3],[0,2,2],[1,2,3],[7,0,5],[7,6,2],[5,7,2.5],[5,6,2],[3,2,2]],sel:6},
+      {tokens:['学生','因为','没','交','作业','被','老师','批评'],
+       rel:[[7,0,5],[7,6,4],[5,7,4],[5,6,3],[0,4,2],[0,1,2],[3,4,2],[6,0,2]],sel:7},
+      {tokens:['他','把','那本','书','递给','了','她'],
+       rel:[[4,3,5],[4,6,4],[4,0,3],[6,3,2],[0,3,2],[3,2,2],[1,3,1.5]],sel:4}
+    ];
+    let si=0,sel=-1;
+    function render(){
+      const s=SENTS[si];const n=s.tokens.length;
+      const W=buildAttn(n,s.rel,{self:1.1,def:0.28});
+      if(sel<0||sel>=n)sel=s.sel;
+      const row=W[sel];
+      let h='<p class="mat-label">点击一个词，看它把注意力分给谁 ↓</p>';
+      h+='<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px">';
+      s.tokens.forEach((t,i)=>{const on=i===sel;
+        h+=`<button data-t="${i}" style="font-family:var(--sans);font-size:15px;padding:7px 12px;border-radius:8px;border:1px solid ${on?'var(--signal)':'var(--rule-strong)'};background:${on?'#fff':'#FBFCFE'};color:${on?'var(--signal)':'var(--ink)'};font-weight:${on?700:500};cursor:pointer">${esc(t)}</button>`;});
+      h+='</div>';
+      h+=`<p class="mat-label">“<span style="color:var(--signal)">${esc(s.tokens[sel])}</span>” 的注意力分配（每列越暖＝越关注）</p>`;
+      h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+      s.tokens.forEach((t,j)=>{const w=row[j];const t2=clamp(w/0.45,0,1);
+        h+=`<div style="min-width:64px;padding:8px 9px;border-radius:8px;background:${cmapCss(t2)};color:${inkOn(t2)};text-align:center;border:1px solid rgba(14,26,50,.06)"><div style="font-size:14px">${esc(t)}</div><div style="font-family:var(--mono);font-size:11px;opacity:.85">${(w*100).toFixed(0)}%</div></div>`;});
+      h+='</div>';
+      viz.innerHTML=h;
+      $$('[data-t]',viz).forEach(b=>b.addEventListener('click',()=>{sel=+b.dataset.t;render();}));
+    }
+    $('#sentNext').addEventListener('click',()=>{si=(si+1)%SENTS.length;sel=-1;render();});
+    $('#sentPrev').addEventListener('click',()=>{si=(si-1+SENTS.length)%SENTS.length;sel=-1;render();});
+    render();
+  })();
+
+  /* ================= DEMO 02: step-through attention ================= */
+  (function(){
+    const stage=$('#d2Stage');if(!stage)return;
+    const PRESETS=[
+      {tokens:['我','爱','深度','学习'],
+       Q:[[1,0,1],[0,1,1],[1,1,0],[0,0,1]],
+       K:[[1,1,0],[0,1,1],[1,0,1],[1,1,1]],
+       V:[[1,0,0],[0,1,0],[0,0,1],[1,1,1]]},
+      {tokens:['猫','坐','在','垫子'],
+       Q:[[2,1,0],[0,2,1],[1,0,2],[1,1,1]],
+       K:[[2,0,1],[1,2,0],[0,1,2],[1,1,1]],
+       V:[[1,1,0],[0,1,1],[1,0,1],[2,0,0]]}
+    ];
+    let pi=0,step=0,mask=false,data=clone(PRESETS[0]);
+    function clone(o){return JSON.parse(JSON.stringify(o));}
+    function randData(){
+      const r=()=>Math.round(Math.random()*4-1);
+      const g=()=>[[r(),r(),r()],[r(),r(),r()],[r(),r(),r()],[r(),r(),r()]];
+      data={tokens:['A','B','C','D'],Q:g(),K:g(),V:g()};
+    }
+    const STEPS=['①输入 Q K V','②打分 QKᵀ','③缩放 ÷√dₖ','④softmax 归一化','⑤乘 V 得输出'];
+    function compute(){
+      const Q=data.Q,K=data.K,V=data.V;
+      const dk=Q[0].length,scale=Math.sqrt(dk);
+      const S=matMul(Q,matT(K));
+      const scaled=S.map(r=>r.map(x=>x/scale));
+      const masked=scaled.map((r,i)=>r.map((x,j)=>(mask&&j>i)?-Infinity:x));
+      const W=rowSoftmax(masked);
+      const O=matMul(W,V);
+      return {Q,K,V,dk,scale,S,scaled,masked,W,O};
+    }
+    function render(){
+      const c=compute();const n=data.tokens.length;
+      // step bar
+      $('#d2Steps').innerHTML=STEPS.map((s,i)=>`<span class="s ${i===step?'on':(i<step?'done':'')}">${s}</span>`).join('');
+      $('#d2Back').disabled=step===0;$('#d2Next').disabled=step===STEPS.length-1;
+      let h='',hint='';
+      const L=data.tokens;
+      if(step===0){
+        h='<p class="mat-label">每个词先变成一个向量（这里是 d<sub>k</sub>=3 的小例子）。Q、K、V 由同一个词向量乘不同矩阵得到。</p>';
+        h+='<div class="mats-wrap" style="display:flex;gap:30px;flex-wrap:wrap">';
+        h+=`<div class="mat-block"><p class="mat-label">Q 查询</p>${heatHTML(c.Q,{rows:L,cell:46,plain:true,showVal:true,dec:0})}</div>`;
+        h+=`<div class="mat-block"><p class="mat-label">K 键</p>${heatHTML(c.K,{rows:L,cell:46,plain:true,showVal:true,dec:0})}</div>`;
+        h+=`<div class="mat-block"><p class="mat-label">V 值</p>${heatHTML(c.V,{rows:L,cell:46,plain:true,showVal:true,dec:0})}</div>`;
+        h+='</div>';
+        hint='下一步会把每个 Q 和每个 K 做点积，得到一个“谁和谁像”的分数表。';
+      }else if(step===1){
+        h=`<p class="mat-label">S = Q Kᵀ　（${n}×${n} 分数表：第 i 行＝词 i 对各个 K 的匹配度）</p>`;
+        h=heatHTML(c.S,{rows:L,cols:L,cell:46,dec:1});
+        hint='每个格子是一个点积。数值越暖表示“这个词的查询”和“那个词的键”越匹配。';
+      }else if(step===2){
+        const disp=mask?c.masked:c.scaled;
+        h=`<p class="mat-label">S ÷ √dₖ　（dₖ=${c.dk}，√dₖ≈${c.scale.toFixed(2)}）${mask?'　·　已施加因果掩码（右上角 −∞）':''}</p>`;
+        h=heatHTML(disp,{rows:L,cols:L,cell:46,dec:2});
+        hint=mask?'缩放后，把“未来位置”的分数设为 −∞，稍后 softmax 会让它们变成 0。':'除以 √dₖ 把数值拉回舒适区间，避免下一步 softmax 过于极端。';
+      }else if(step===3){
+        h='<p class="mat-label">softmax（按行）→ 注意力权重，每行加起来 = 1</p>';
+        h=heatHTML(c.W,{rows:L,cols:L,cell:46,denom:1,dec:2});
+        hint='每一行的数字就是“这个词把 100% 注意力怎么分配”。可以对照动手 01 的直觉。';
+      }else{
+        h='<p class="mat-label">输出 = 权重 × V　（每个词的新向量，已经融进其它词的信息）</p>';
+        h=heatHTML(c.O,{rows:L,cell:46,dec:2});
+        hint='这就是一个词的“上下文表示”。整条链没有任何循环——所有词同时算完。';
+      }
+      stage.innerHTML=h;
+      $('#d2Hint').textContent=hint;
+    }
+    $('#d2Next').addEventListener('click',()=>{step=clamp(step+1,0,STEPS.length-1);render();});
+    $('#d2Back').addEventListener('click',()=>{step=clamp(step-1,0,STEPS.length-1);render();});
+    $('#d2Reset').addEventListener('click',()=>{step=0;render();});
+    $('#d2Rand').addEventListener('click',()=>{randData();step=0;render();setPresetUI(-1);});
+    $('#d2Mask').addEventListener('change',e=>{mask=e.target.checked;render();});
+    $$('#d2Preset button').forEach(b=>b.addEventListener('click',()=>{pi=+b.dataset.p;data=clone(PRESETS[pi]);step=0;setPresetUI(pi);render();}));
+    function setPresetUI(i){$$('#d2Preset button').forEach(b=>b.classList.toggle('on',+b.dataset.p===i));}
+    render();
+  })();
+
+  /* ================= DEMO 03: softmax explorer ================= */
+  (function(){
+    const wrap=$('#smSliders');if(!wrap)return;
+    const names=['甲','乙','丙','丁'];const vals=[2,1,0,-1];
+    let h='';
+    names.forEach((nm,i)=>{
+      h+=`<div style="display:grid;grid-template-columns:26px 1fr 54px;gap:12px;align-items:center;margin:8px 0">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--ink-soft)">${nm}</span>
+        <input type="range" min="-5" max="10" step="0.5" value="${vals[i]}" data-k="${i}">
+        <span style="font-family:var(--mono);font-size:13px;text-align:right" data-v="${i}">${vals[i].toFixed(1)}</span></div>`;
+    });
+    wrap.innerHTML=h;
+    const bars=$('#smBars');
+    function update(){
+      const p=softmaxRow(vals);
+      bars.innerHTML=names.map((nm,i)=>{
+        const t=clamp(p[i],0,1);
+        return `<div class="bar-row"><span class="k">${nm}</span><span class="bar-track"><span class="bar-fill" style="width:${(p[i]*100).toFixed(1)}%;background:${cmapCss(0.25+0.75*p[i])}"></span></span><span class="v">${(p[i]*100).toFixed(1)}%</span></div>`;
+      }).join('');
+    }
+    $$('input[type=range]',wrap).forEach(r=>r.addEventListener('input',e=>{
+      const i=+e.target.dataset.k;vals[i]=parseFloat(e.target.value);
+      $(`[data-v="${i}"]`,wrap).textContent=vals[i].toFixed(1);update();
+    }));
+    update();
+  })();
+
+  /* ================= DEMO 04: scaling ================= */
+  (function(){
+    const rng=$('#dkRange');if(!rng)return;
+    const base=[1.8,0.9,0.4,0.0,-0.5];
+    function update(){
+      const dk=+rng.value;$('#dkVal').textContent=dk;
+      const s=Math.sqrt(dk);
+      const unscaled=base.map(x=>x*s);
+      const scaled=base.map(x=>x);
+      const pu=softmaxRow(unscaled),ps=softmaxRow(scaled);
+      const labs=['①','②','③','④','⑤'];
+      function rows(p){return p.map((v,i)=>`<div class="bar-row"><span class="k">${labs[i]}</span><span class="bar-track"><span class="bar-fill" style="width:${(v*100).toFixed(1)}%;background:${cmapCss(0.25+0.75*v)}"></span></span><span class="v">${(v*100).toFixed(1)}%</span></div>`).join('');}
+      $('#unscaledBars').innerHTML=rows(pu);
+      $('#scaledBars').innerHTML=rows(ps);
+    }
+    rng.addEventListener('input',update);update();
+  })();
+
+  /* ================= DEMO 05: multi-head ================= */
+  (function(){
+    const stage=$('#mhStage');if(!stage)return;
+    const tokens=['小猫','追','老鼠','因为','它','饿'];
+    const n=tokens.length;
+    const heads=[
+      {name:'头 1 · 看邻近',desc:'主要关注相邻的词，捕捉局部搭配（如“追→老鼠”）。',
+       M:buildAttn(n,[[0,1,4],[1,2,4],[2,1,3],[3,4,3],[4,5,3],[1,0,3]],{self:1.2,def:0.4})},
+      {name:'头 2 · 看指代/语法',desc:'把“它”连回“小猫”，把动词连回主语——消解指代、理清主谓。',
+       M:buildAttn(n,[[4,0,7],[4,1,3],[1,0,5],[1,2,4],[5,0,4],[5,4,2]],{self:1.0,def:0.25})},
+      {name:'头 3 · 看全局',desc:'几乎平均地看所有词，起“汇总全句”的作用。',
+       M:buildAttn(n,[],{self:1.4,def:1.0})}
+    ];
+    let cur=0,all=false;
+    function panel(hd,idx){
+      return `<div style="flex:1;min-width:250px">
+        <p class="mat-label">${esc(hd.name)}</p>
+        ${heatHTML(hd.M,{rows:tokens,cols:tokens,cell:40,denom:1,showVal:false})}
+        <p class="hint" style="margin-top:10px">${esc(hd.desc)}</p></div>`;
+    }
+    function render(){
+      $$('#mhHeads button').forEach(b=>b.classList.toggle('on',+b.dataset.h===cur&&!all));
+      $('#mhAll').style.opacity=all?1:.75;
+      if(all){
+        stage.innerHTML='<div style="display:flex;gap:26px;flex-wrap:wrap">'+heads.map((h,i)=>panel(h,i)).join('')+'</div>';
+      }else{
+        stage.innerHTML=panel(heads[cur],cur);
+      }
+    }
+    $('#mhHeads').innerHTML=heads.map((h,i)=>`<button data-h="${i}" class="${i===0?'on':''}">头 ${i+1}</button>`).join('');
+    $$('#mhHeads button').forEach(b=>b.addEventListener('click',()=>{cur=+b.dataset.h;all=false;render();}));
+    $('#mhAll').addEventListener('click',()=>{all=!all;render();});
+    render();
+  })();
+
+  /* ================= DEMO 06: positional encoding ================= */
+  (function(){
+    const heat=$('#peHeat'),curve=$('#peCurve');if(!heat)return;
+    const D=64,POS=48;              // dims, positions shown
+    const FULL=80;                  // for curve
+    function peColor(v){            // diverging: -1 teal .. 0 white .. +1 red
+      if(v>=0)return `rgb(${Math.round(255-29*v)},${Math.round(255-193*v)},${Math.round(255-168*v)})`;
+      const t=-v;return `rgb(${Math.round(255-241*t)},${Math.round(255-101*t)},${Math.round(255-88*t)})`;
+    }
+    function pe(pos,i){const ang=pos/Math.pow(10000,(2*Math.floor(i/2))/D);return i%2===0?Math.sin(ang):Math.cos(ang);}
+    const dpr=Math.min(2,window.devicePixelRatio||1);
+    let hotPos=10;
+
+    function setup(cv){const w=360,h=300;cv.width=w*dpr;cv.height=h*dpr;const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return {ctx,w,h};}
+
+    function drawHeat(){
+      const {ctx,w,h}=setup(heat);
+      const padL=30,padT=20,padB=22,padR=8;
+      const cw=(w-padL-padR)/D,chh=(h-padT-padB)/POS;
+      for(let p=0;p<POS;p++)for(let i=0;i<D;i++){
+        ctx.fillStyle=peColor(pe(p,i));
+        ctx.fillRect(padL+i*cw,padT+p*chh,cw+0.6,chh+0.6);
+      }
+      // highlight the hovered position row
+      ctx.strokeStyle='#0E1A32';ctx.lineWidth=2;
+      ctx.strokeRect(padL-1,padT+hotPos*chh-1,D*cw+2,chh+2);
+      ctx.fillStyle='#0E1A32';ctx.font='600 10px sans-serif';ctx.textAlign='left';
+      ctx.fillText('pos '+hotPos,padL,padT-7);
+      // axis labels
+      ctx.fillStyle='#8A94AC';ctx.font='10px sans-serif';ctx.textAlign='center';
+      ctx.fillText('维度（0→63）',w/2,h-6);
+      ctx.save();ctx.translate(11,h/2);ctx.rotate(-Math.PI/2);ctx.fillText('位置（0→47）',0,0);ctx.restore();
+    }
+    function drawCurve(){
+      const {ctx,w,h}=setup(curve);
+      const padL=30,padT=26,padB=22,padR=10;
+      const x=(p)=>padL+(p/(FULL-1))*(w-padL-padR);
+      const y=(v)=>padT+(1-(v+1)/2)*(h-padT-padB);
+      // guides at +1, 0, -1
+      ctx.strokeStyle='#E3E9F3';ctx.lineWidth=1;
+      [1,0,-1].forEach(v=>{ctx.beginPath();ctx.moveTo(padL,y(v));ctx.lineTo(w-padR,y(v));ctx.stroke();});
+      const dims=[0,2,4,6,8];
+      const cols=['#E23E57','#6C5CE7','#0E9AA7','#F2B23E','#2FA36B'];
+      dims.forEach((di,k)=>{
+        ctx.strokeStyle=cols[k];ctx.lineWidth=1.7;ctx.beginPath();
+        for(let p=0;p<FULL;p++){const xx=x(p),yy=y(pe(p,di));p?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);}
+        ctx.stroke();
+      });
+      ctx.strokeStyle='#0E1A32';ctx.lineWidth=1.4;ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(x(hotPos),padT-6);ctx.lineTo(x(hotPos),h-padB);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='#8A94AC';ctx.font='10px sans-serif';ctx.textAlign='center';
+      ctx.fillText('位置（0→79）',w/2,h-6);
+      ctx.textAlign='left';
+      dims.forEach((di,k)=>{ctx.fillStyle=cols[k];ctx.fillRect(padL+k*40,9,12,3);ctx.fillStyle='#56617E';ctx.font='9.5px sans-serif';ctx.fillText('dim '+di,padL+2+k*40,21);});
+    }
+    function redraw(){drawHeat();drawCurve();}
+    heat.addEventListener('mousemove',e=>{
+      const r=heat.getBoundingClientRect();
+      const padL=30,padT=20,padB=22,padR=8;
+      const w=360,h=300;
+      const cw=(w-padL-padR)/D,chh=(h-padT-padB)/POS;
+      const sc=w/r.width;
+      const y=(e.clientY-r.top)*sc;
+      const p=clamp(Math.floor((y-padT)/chh),0,POS-1);
+      if(p!==hotPos){hotPos=p;redraw();}
+    });
+    redraw();
+  })();
+
+  /* ================= DEMO 07: causal mask ================= */
+  (function(){
+    const host=$('#maskViz');if(!host)return;
+    const tokens=['我','爱','学习','AI','。'];const n=tokens.length;
+    const SC=scoreMatrix(n,[[0,1,3],[1,2,3],[2,3,3],[3,4,2],[1,0,2],[2,1,2]],{self:2.2,def:0.6});
+    let maskedOn=true;
+    function render(){
+      const M=maskedOn?SC.map((r,i)=>r.map((v,j)=>j>i?-Infinity:v)):SC;
+      const W=rowSoftmax(M);
+      let h='<div class="ctrl-row" style="margin-bottom:16px">';
+      h+=`<div class="seg" id="maskSeg"><button data-m="1" class="${maskedOn?'on':''}">✅ 加因果掩码</button><button data-m="0" class="${!maskedOn?'on':''}">❌ 不加</button></div>`;
+      h+='</div>';
+      h+='<div class="mats-wrap" style="display:flex;gap:34px;flex-wrap:wrap;align-items:flex-start">';
+      h+=`<div><p class="mat-label">注意力分数（−∞ 表示被掩掉）</p>${heatHTML(M,{rows:tokens,cols:tokens,cell:44,dec:1})}</div>`;
+      h+=`<div><p class="mat-label">softmax 之后 → 概率</p>${heatHTML(W,{rows:tokens,cols:tokens,cell:44,denom:1,dec:2})}</div>`;
+      h+='</div>';
+      h+='<p class="hint">未加掩码时，第 1 个词（我）能看到全部 5 个词；加掩码后，每行只对左边及自身有非零概率，注意力矩阵变成下三角。</p>';
+      host.innerHTML=h;
+      $$('#maskSeg button',host).forEach(b=>b.addEventListener('click',()=>{maskedOn=b.dataset.m==='1';render();}));
+    }
+    render();
+  })();
+
+})();
+</script>
+
+</body>
+</html>

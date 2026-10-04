@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B2 · 向量里装了什么 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0}.seg button+button{border-left:1px solid var(--rule-strong)}.seg button.on{background:var(--ink);color:#fff}.seg button.on:hover{color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  canvas{width:100%;height:auto;display:block;border-radius:10px}
+  .cap{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:10px;text-align:center}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">B2 · 向量里装了什么</span><span><a href="课程-B1-从词到向量.html">← 回 B1</a> 　·　 第 5 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>表里每个词的那串数，<strong>装着“意思”</strong>——弄懂它，才知道“改写表”改写的是什么。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 B · 词怎么变成数 · 第 2 关（最后一关）</p>
+    <h1>向量里到底装了什么</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>上一关给每个词配了一串数字。这关要问：这串数字里到底“装”着什么？为什么说它装着“意思”？你会看到一个神奇现象——<strong>数字之间做加减，居然能对上词义的加减</strong>。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>一个词的向量是一串数，比如 <code>[9, 1, 3, 2]</code>。单独挑出其中一个数（比如那个 3），能说明这个词的某个意思吗？</p>
+    <div class="guess">
+      <button data-g="yes">能，每个数代表一个特点</button>
+      <button data-g="no">不能，得整串一起看</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先猜一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">每个词都配上了一串数字。那这串数字里，到底写了什么？</p>
+    <p>先给一个有点“反常识”的答案：<span class="hl">单独揪出某一个数字，它什么也说明不了。</span></p>
+    <p>打个比方。地图上写着“东经 116.4”——单看这一个数，你知道我在哪吗？不知道。得和“北纬 39.9”配在一起，才定出“北京”。<strong>单个数字没意义，配成一对、拼成一个“位置”，才有意义。</strong></p>
+    <p>词向量也一样。别问“第 3 位数字是不是代表毛茸茸”——没有这回事。装着意思的，是<strong>这一整串数字拼出来的“位置”</strong>。位置挨得近，意思就相近。</p>
+    <p>这一关还要往前走一步——不光“近不近”有用，<span class="hl">连“从一个词走到另一个词的方向”，也带着意思</span>。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>不能，得整串一起看</strong>”。单个数字没意义，整串拼出的“位置”才有意义。你猜对了吗？</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 单个数字没意义，整串的“位置”才有意义。</strong>别给每一位硬安一个名字。</p>
+      <p><strong>② “位置近”讲的是意思像；“方向”讲的是词与词的关系。</strong>两个不同的东西，别混。</p>
+      <p><strong>③ 这张“意思地图”不是人画的</strong>——是机器训练时自己排出来的。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>把词向量想成一张“意思地图”，地图上每个点是一个词。记住三件事。</p>
+    <p><strong>第一，挨得近 = 意思近。</strong>“猫”和“狗”挤在一起，“猫”和“汽车”隔得老远。这是上一关说过的。</p>
+    <p><strong>第二，方向也带着意思。</strong>这是最妙的一点。看地图上四个词：男人、国王、女人、王后。从“男人”走到“国王”的方向，意思是“变得更尊贵（变成君主）”。现在从“女人”出发，朝<strong>同一个方向</strong>走一步，会走到哪？——正好到“王后”。</p>
+    <p style="text-align:center;font-family:var(--mono);font-size:15px;margin:1.1em 0;line-height:1.9">国王 − 男人 + 女人 ≈ <strong>王后</strong></p>
+    <p>这串式子就是“方向能表示关系”的写法：先算“男人→国王”这个方向，再把它加到“女人”身上，就得到“王后”。<strong>不用会算它</strong>，你只要感受：数字之间的“加一加、减一减”，居然能对上意思上的“加一加、减一减”。</p>
+    <div class="note"><span class="tag">第三，也是最关键的</span><p>这张“意思地图”<strong>不是人画的</strong>。训练刚开始时，所有词都是被<strong>随手乱丢</strong>在地图上的，位置毫无道理；练得越多，这些词才慢慢挪到“该在的地方”。所以：<strong>训练前，数字是乱数、没意义；训练后，才排出一张有道理的意思地图。</strong></p></div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：现在图上四个词是“乱放”的。我一切到“训练后”，它们会变成什么样？先猜，再切。</p>
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 训练前 vs 训练后</span><span class="seg" id="modeSeg"><button data-m="0" class="on">训练前（乱放）</button><button data-m="1">训练后（各就各位）</button></span></div>
+      <div class="card-b">
+        <canvas id="map" width="360" height="320"></canvas>
+        <p class="cap" id="mapNote">训练前：四个词被随手乱丢，位置没有道理——谁挨着谁纯属碰巧。</p>
+      </div>
+    </div>
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 停在“训练前”，记住四个词是乱堆的。<br>2. 切到“训练后”，看它们各就各位：男/女分成两行，国王和王后在上、男人和女人在下。<br>3. 盯着两条箭头：从“男人”到“国王”，和从“女人”到“王后”——它俩是不是<strong>朝同一个方向、一样长</strong>？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">两条箭头方向一致、长度一样，说明“变成君主”这个变化，对男人和对女人是<strong>同一个方向</strong>。所以“女人 + 这个方向 = 王后”。数字里居然藏着这种关系，这就是词向量厉害的地方。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>词向量里<strong>单独一个数字</strong>，能说明什么？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>能说明某个具体特点，比如“毛茸茸”</span></div><div class="opt" data-a="B"><span class="k">B</span><span>什么都说明不了，要整串一起看它的“位置”</span></div><div class="opt" data-a="C"><span class="k">C</span><span>能说明这个词常用不常用</span></div><div class="opt" data-a="D"><span class="k">D</span><span>能说明这个词有几个字</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B</strong>。单个数字没意义，就像地图上单看“东经 116.4”定不了位。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>判断：“国王 − 男人 + 女人 ≈ 王后”说明，数字之间的<strong>方向</strong>也带着意思上的关系。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。“男人→国王”和“女人→王后”是同一个方向，代表同一种意思上的变化。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：词向量里的数字，是人一个一个手写定好的。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。这些数字是机器在训练里自己“学”出来的。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>训练<strong>开始前</strong>，词向量的数字是什么样？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>已经排得整整齐齐、很有道理</span></div><div class="opt" data-a="B"><span class="k">B</span><span>是随机的乱数，还没有意义</span></div><div class="opt" data-a="C"><span class="k">C</span><span>全部是 0</span></div><div class="opt" data-a="D"><span class="k">D</span><span>全部是 1</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B</strong>。一开始是随手乱放的乱数，训练之后才慢慢排出有道理的位置。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】按“方向表示关系”的道理，<code>国王 − 男人 + 女人</code> 大致等于哪个词？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>王后</span></div><div class="opt" data-a="B"><span class="k">B</span><span>汽车</span></div><div class="opt" data-a="C"><span class="k">C</span><span>苹果</span></div><div class="opt" data-a="D"><span class="k">D</span><span>猫</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A · 王后</strong>。“男人→国王”这个方向加到“女人”身上，正好到“王后”。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li><strong>单个数字没意义</strong>，整串拼出的“位置”才装着意思。</li>
+        <li>位置近 = 意思近；<strong>方向</strong>还能表示词与词的关系（国王−男人+女人≈王后）。</li>
+        <li>这张意思地图是<strong>训练里自己排出来的</strong>，不是人画的。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="从零到Transformer-学习地图.html">🎉 过关 · 回学习地图</a>
+      <div class="pending">阶段 B 学完了！下一站 <b>C1 · 为什么要注意力（开会 vs 传话）</b>。<a href="课程-C1-为什么要注意力.html" style="color:var(--violet)">在新窗口打开 C1</a>（或在聊天里回一句"<b>开 C1</b>"）；也可以 <a href="课程-B1-从词到向量.html" style="color:var(--violet)">回 B1 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · B2 · 向量里装了什么</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='no'
+      ? '<strong>猜对了！</strong>单个数字没意义，得整串一起看它的“位置”。'
+      : '<strong>你猜“每个数代表一个特点”。</strong>其实不是——真实词向量里没有哪一位专门代表某个特点，得整串一起看。';
+  }));
+
+  const WORDS=[{w:'男人',col:'#0E9AA7'},{w:'国王',col:'#0E9AA7'},{w:'女人',col:'#E23E57'},{w:'王后',col:'#E23E57'}];
+  const ORG={男人:[2,1],国王:[3,3],女人:[5,1],王后:[6,3]};
+  const RND={男人:[6.2,4.1],国王:[1.3,1.4],女人:[3.1,3.7],王后:[7.1,0.7]};
+  let mode=0;
+  const map=$('#map');
+  function dpr(){return Math.min(2,window.devicePixelRatio||1);}
+  const padL=40,padT=18,padB=30,padR=18, XMAX=8, YMAX=5;
+  function toPx(x,y){const w=360,h=320;return [padL+(w-padL-padR)*x/XMAX,(h-padB)-(h-padT-padB)*y/YMAX];}
+  function arrow(ctx,x1,y1,x2,y2,col){ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();const ang=Math.atan2(y2-y1,x2-x1),L=11;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-L*Math.cos(ang-0.4),y2-L*Math.sin(ang-0.4));ctx.lineTo(x2-L*Math.cos(ang+0.4),y2-L*Math.sin(ang+0.4));ctx.closePath();ctx.fill();}
+  function render(){
+    const w=360,h=320;map.width=w*dpr();map.height=h*dpr();
+    const ctx=map.getContext('2d');ctx.setTransform(dpr(),0,0,dpr(),0,0);ctx.clearRect(0,0,w,h);
+    ctx.strokeStyle='#EEF2F8';ctx.lineWidth=1;
+    for(let i=0;i<=8;i++){const gx=toPx(i,0)[0];ctx.beginPath();ctx.moveTo(gx,padT);ctx.lineTo(gx,h-padB);ctx.stroke();}
+    for(let j=0;j<=5;j++){const gy=toPx(0,j)[1];ctx.beginPath();ctx.moveTo(padL,gy);ctx.lineTo(w-padR,gy);ctx.stroke();}
+    const pos=mode===1?ORG:RND;
+    if(mode===1){const a1=toPx(...pos.男人),a2=toPx(...pos.国王),b1=toPx(...pos.女人),b2=toPx(...pos.王后);arrow(ctx,a1[0],a1[1],a2[0],a2[1],'#6C5CE7');arrow(ctx,b1[0],b1[1],b2[0],b2[1],'#6C5CE7');}
+    ctx.fillStyle='#8A94AC';ctx.font='11px sans-serif';ctx.fillText('意思地图（横竖方向的名字我省掉了）',padL,13);
+    WORDS.forEach(o=>{const g=toPx(...pos[o.w]);ctx.fillStyle=o.col;ctx.beginPath();ctx.arc(g[0],g[1],7,0,7);ctx.fill();ctx.fillStyle='#0E1A32';ctx.font='600 12px sans-serif';ctx.fillText(o.w,g[0]+10,g[1]-9);});
+  }
+  function setMode(m){mode=m;$$('#modeSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.m===m));render();$('#mapNote').textContent=m===1?'训练后：词各就各位。两条紫色箭头方向一致、一样长——“男人→国王”和“女人→王后”是同一种变化（变成君主）。':'训练前：四个词被随手乱丢，位置没有道理——谁挨着谁纯属碰巧。';}
+  $$('#modeSeg button').forEach(b=>b.addEventListener('click',()=>setMode(+b.dataset.m)));
+  setMode(0);
+
+  const CORRECT={'1':'B','2':'T','3':'F','4':'B','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！阶段 B 学完啦 🎉</h3><p>5 道全对。你已经懂：<strong>单个数字没意义，整串拼出的“位置”才装着意思；位置近=意思近，方向还能表示关系；这些位置是训练里自己排出来的</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

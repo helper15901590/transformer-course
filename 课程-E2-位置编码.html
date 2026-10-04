@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E2 · 位置编码 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0}.seg button+button{border-left:1px solid var(--rule-strong)}.seg button.on{background:var(--ink);color:#fff}.seg button.on:hover{color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  canvas{width:100%;height:auto;display:block;border-radius:10px}
+  .cap{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:10px;text-align:center}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">E2 · 位置编码</span><span><a href="课程-E1-多头注意力.html">← 回 E1</a> 　·　 第 15 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>注意力不认“顺序”——补一个<strong>位置编码</strong>，让每个词带上“我是第几个”。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 E · 让它变强 · 第 2 关</p>
+    <h1>位置编码：<br>给每个词发个“位置戳”</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>注意力有个天生的毛病：它把一句话当成<strong>一堆词的集合</strong>，分不清先后。“猫追狗”和“狗追猫”在它眼里几乎一样。这关学<strong>位置编码</strong>：给每个位置配一个专属向量，把“谁在前、谁在后”补进去。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>“猫追狗”和“狗追猫”，词一模一样、只是顺序换了。注意力（开会式，谁都能看谁）能不能一眼分清这俩？</p>
+    <div class="guess">
+      <button data-g="yes">能，顺序不一样它看得出</button>
+      <button data-g="no">不能，它天生不认顺序</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">注意力算“谁和谁像”，跟“谁在第几个位置”没关系。</p>
+    <p>“猫追狗”和“狗追猫”：词一样，每个词和别的词的“像不像”关系也一样，只是排的位置换了。注意力算出来的是同一套“像不像”，<strong>根本分不清谁追谁</strong>——因为它是“词袋”，没有顺序概念。</p>
+    <p>但顺序明明很重要。怎么办？<span class="hl">给每个“位置”配一个专属的向量（位置编码），加在词向量上</span>。这样第 1 个位置的词和第 2 个位置的词，即使词一样，也会带上不同的“位置戳”。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>不能</strong>”。注意力天生不认顺序，需要位置编码补上。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p>位置编码 = <strong>给每个位置发一个专属向量，加在词向量上</strong>，补上“谁在前谁在后”。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 位置编码是“加”上去的，不是“乘”。</strong>词向量 + 位置向量，简单相加。</p>
+      <p><strong>② 它是“位置”的向量，跟词是什么无关。</strong>第 3 个位置不管是“猫”还是“狗”，用的都是同一个“第 3 位”的向量。</p>
+      <p><strong>③ 不用“0、1、2、3…”当编码。</strong>那样数字会越加越大、压过词义。用 sin/cos 更稳。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>论文用的是<strong>正弦位置编码</strong>：位置的第 2i 个数字用 sin、第 2i+1 个用 cos，不同位置、不同维度用不同“频率”的波。</p>
+    <p style="text-align:center;font-family:var(--mono);font-size:14px;line-height:2;margin:1em 0">
+      PE(pos, 2i) = sin( pos / 10000<sup>2i/d</sup> )<br>
+      PE(pos, 2i+1) = cos( pos / 10000<sup>2i/d</sup> )
+    </p>
+    <p>别背这串公式，记住三件事：</p>
+    <ul>
+      <li><strong>每个位置有一串独一无二的数字</strong>（像“位置指纹”）。</li>
+      <li><strong>低维变化快、高维变化慢</strong>（不同频率的波叠在一起）。</li>
+      <li><strong>值永远在 [−1, 1]</strong>，不会越加越大。</li>
+    </ul>
+    <p>还有一个额外好处：sin/cos 有规律，位置 <code>pos+k</code> 的编码能由位置 <code>pos</code> 推出来——模型容易学会“相隔 k 步”这种相对关系。</p>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：位置编码长什么样——是单调变大的一串数，还是像波浪一样上下起伏？猜完看下面的图。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 位置编码长什么样</span><span id="hoverpos">把鼠标放到图上</span></div>
+      <div class="card-b">
+        <canvas id="heat" width="360" height="240"></canvas>
+        <p class="cap">每一<strong>行</strong>是一个位置的编码：低维（左侧）变化快，高维（右侧）变化慢。颜色越暖值越大。</p>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 盯着最左侧几列——它们的颜色是不是“一格一换”，变化很快？<br>2. 再看最右侧几列——是不是几乎不变（变化很慢）？<br>3. 用鼠标在图上上下移动，看每个位置的“指纹”确实各不相同。</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">位置编码就像给每个位置发了一串“不同频率的波”：低维是高音、高维是低音，合起来每个位置都是独一无二的组合。这就是它能表示“谁在前、谁在后”的原因。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>为什么注意力需要位置编码？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>因为它天生不认顺序，分不清“猫追狗”和“狗追猫”</span></div><div class="opt" data-a="B"><span class="k">B</span><span>因为它算得太慢，加位置能提速</span></div><div class="opt" data-a="C"><span class="k">C</span><span>因为它记不住词的意思</span></div><div class="opt" data-a="D"><span class="k">D</span><span>因为词向量太长</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。注意力是“词袋”，只算“像不像”，没有顺序概念，需要位置编码补上。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>位置编码是怎么“加”进模型的？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>词向量 + 位置向量，直接相加</span></div><div class="opt" data-a="B"><span class="k">B</span><span>词向量 × 位置向量</span></div><div class="opt" data-a="C"><span class="k">C</span><span>把词向量替换成位置向量</span></div><div class="opt" data-a="D"><span class="k">D</span><span>单独再走一层网络</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。把位置编码直接加在词向量上，简单相加。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：位置编码跟词是什么有关——不同的词用不同的位置向量。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。位置编码只跟“位置”有关，跟词无关。第 3 个位置不管放什么词，都用同一个“第 3 位”的向量。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>为什么用 sin/cos，而不用 0、1、2、3…？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>sin/cos 值域稳定在 [−1,1]，不会越加越大压过词义</span></div><div class="opt" data-a="B"><span class="k">B</span><span>因为 0、1、2 算起来慢</span></div><div class="opt" data-a="C"><span class="k">C</span><span>因为 sin/cos 是整数</span></div><div class="opt" data-a="D"><span class="k">D</span><span>没有原因，随便选的</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。sin/cos 永远在 [−1,1]，不会像 0,1,2,…,5000 那样越编越大；而且不同频率叠加，还能让相对位置可推导。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】位置编码里，低维度和高维度哪个变化快？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>低维变化快，高维变化慢</span></div><div class="opt" data-a="B"><span class="k">B</span><span>高维变化快，低维变化慢</span></div><div class="opt" data-a="C"><span class="k">C</span><span>一样快</span></div><div class="opt" data-a="D"><span class="k">D</span><span>都不变</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。低维度（公式里 2i 小的）频率高、变化快；高维度频率低、变化慢。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>注意力不认顺序，<strong>位置编码 = 给每个位置加一个专属向量</strong>。</li>
+        <li>用 <strong>sin/cos</strong>：值稳定、低维快高维慢、相对位置可推。</li>
+        <li>它是<strong>加</strong>在词向量上的，跟词无关、只跟位置有关。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-E3-残差与LayerNorm.html">✅ 过关，进入下一关：E3 · 残差 + LayerNorm →</a>
+      <div class="pending">如果点不动（比如在预览小窗里）——E3 还没生成——回一句"<b>开 E3</b>"，我就把它做出来；也可以 <a href="课程-E1-多头注意力.html" style="color:var(--violet)">回 E1 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · E2 · 位置编码</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='no'
+      ? '<strong>猜对了！</strong>注意力不认顺序，所以“猫追狗”和“狗追猫”它分不清——需要位置编码。'
+      : '<strong>你选了“能分清”。</strong>其实不能——注意力是“词袋”，没有顺序概念。';
+  }));
+
+  const D=64, POS=32;
+  function pe(pos,i){const ang=pos/Math.pow(10000,(2*Math.floor(i/2))/D);return i%2===0?Math.sin(ang):Math.cos(ang);}
+  const heat=$('#heat');
+  function dpr(){return Math.min(2,window.devicePixelRatio||1);}
+  let hotPos=6;
+  function render(){
+    const w=360,h=240;heat.width=w*dpr();heat.height=h*dpr();
+    const ctx=heat.getContext('2d');ctx.setTransform(dpr(),0,0,dpr(),0,0);ctx.clearRect(0,0,w,h);
+    const padL=30,padT=18,padB=20,padR=6;
+    const cw=(w-padL-padR)/D,chh=(h-padT-padB)/POS;
+    for(let p=0;p<POS;p++)for(let i=0;i<D;i++){
+      const v=(pe(p,i)+1)/2;
+      const t=v;const r=Math.round(240-80*t),g=Math.round(247-130*t),b=Math.round(250-130*t);
+      ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fillRect(padL+i*cw,padT+p*chh,cw+0.6,chh+0.6);
+    }
+    ctx.strokeStyle='#0E1A32';ctx.lineWidth=1.6;ctx.strokeRect(padL-1,padT+hotPos*chh-1,D*cw+2,chh+2);
+    ctx.fillStyle='#0E1A32';ctx.font='600 10px sans-serif';ctx.textAlign='left';ctx.fillText('pos '+hotPos,padL,padT-6);
+    ctx.fillStyle='#8A94AC';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('维度（0→63）',w/2,h-6);
+    ctx.save();ctx.translate(11,h/2);ctx.rotate(-Math.PI/2);ctx.fillText('位置（0→31）',0,0);ctx.restore();
+  }
+  heat.addEventListener('mousemove',e=>{
+    const r=heat.getBoundingClientRect();const sc=360/r.width;
+    const y=(e.clientY-r.top)*sc;
+    const padT=18,padB=20;const h=240;const chh=(h-padT-padB)/POS;
+    const p=Math.max(0,Math.min(POS-1,Math.floor((y-padT)/chh)));
+    if(p!==hotPos){hotPos=p;render();$('#hoverpos').textContent='正在看：位置 '+p;}
+  });
+  render();
+
+  const CORRECT={'1':'A','2':'A','3':'F','4':'A','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经懂：<strong>位置编码补上顺序，是“加”在词向量上的 sin/cos 专属向量，低维快高维慢</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

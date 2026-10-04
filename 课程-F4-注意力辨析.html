@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F4 · 三种注意力辨析 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+  .seg button{border:none;border-radius:0}.seg button+button{border-left:1px solid var(--rule-strong)}.seg button.on{background:var(--ink);color:#fff}.seg button.on:hover{color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  table.cmp{border-collapse:collapse;width:100%;font-size:14px;background:#fff;border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+  table.cmp th,table.cmp td{padding:10px 14px;border-bottom:1px solid var(--rule);text-align:left}
+  table.cmp th{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC}
+  table.cmp tr:last-child td{border-bottom:none}
+  table.cmp td .yes{color:var(--good);font-weight:700}
+  table.cmp td .no{color:var(--signal);font-weight:700}
+  .attninfo{background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:16px;margin-top:10px}
+  .attninfo h4{margin:0 0 8px;font-family:var(--mono);font-size:13px}
+  .attninfo .kv{font-family:var(--mono);font-size:13px;color:var(--violet);line-height:2}
+  .attninfo p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+  .stage-review{background:rgba(47,163,107,.08);border:1px solid rgba(47,163,107,.4);border-radius:14px;padding:20px 22px;margin-top:26px}
+  .stage-review b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--good);display:block;margin-bottom:10px}
+  .stage-review p{margin:0;font-size:15.5px;color:var(--ink-soft);line-height:1.85}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">F4 · 三种注意力辨析</span><span><a href="课程-F3-训练流程.html">← 回 F3</a> 　·　 第 21 关 / 共 23 关 · 约 30 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>收尾一关：把三种注意力<strong>彻底分清</strong>，再算清 Transformer 的<strong>代价</strong>（复杂度）。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 F · 整机与训练 · 第 4 关（最后一关）</p>
+    <h1>三种注意力辨析 + 代价</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>整台机器里一共有<strong>三种注意力</strong>，区别只在“Q、K、V 从哪来”。这关把它们一次分清；再算清 Transformer 的<strong>代价</strong>（O(n²) 复杂度），让你知道它“赢在哪、贵在哪”。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>Transformer 又并行、又能看全局，这么好，它<strong>有没有代价</strong>？</p>
+    <div class="guess">
+      <button data-g="free">没有代价，完美</button>
+      <button data-g="cost">有：句子越长，算得越费（n² 增长）</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">先分清三种注意力，再看代价。</p>
+    <p>整台机器里的注意力，其实有三种，<strong>唯一区别是 Q、K、V 从哪来</strong>：</p>
+    <ul>
+      <li><strong>编码器自注意力</strong>：Q、K、V 都来自<strong>源句</strong>（源句内部互相理解）。</li>
+      <li><strong>解码器掩码自注意力</strong>：Q、K、V 都来自<strong>已写出的词</strong>，且不许看未来。</li>
+      <li><strong>交叉注意力</strong>：Q 来自<strong>解码器</strong>，K、V 来自<strong>编码器输出</strong>（读源句）。</li>
+    </ul>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>有代价</strong>”。n 个词要算 n×n 的分数表，句子越长越费（O(n²)）。你猜对了吗？</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 三种注意力，算法完全一样，只有“Q、K、V 从哪来”不同。</strong>别被名字吓到。</p>
+      <p><strong>② “自注意力”= Q 和 K、V 来自同一堆词；“交叉”= Q 来自一边、K/V 来自另一边。</strong></p>
+      <p><strong>③ O(n²) 是它的软肋：</strong>长文本会吃紧。这是后来一堆“高效注意力”研究（稀疏、线性、FlashAttention）的出发点。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>三种注意力，一张表记住（Q / K / V 的来源）：</p>
+    <div style="overflow-x:auto"><table class="cmp">
+      <thead><tr><th>名字</th><th>Q 来自</th><th>K、V 来自</th><th>干什么</th></tr></thead>
+      <tbody>
+        <tr><td>编码器自注意力</td><td>源句</td><td>源句</td><td>源句内部互相理解</td></tr>
+        <tr><td>解码器掩码自注意力</td><td>已写出的词</td><td>已写出的词</td><td>生成时不许看未来</td></tr>
+        <tr><td>交叉注意力</td><td>解码器</td><td>编码器输出</td><td>把源句信息读进来</td></tr>
+      </tbody>
+    </table></div>
+    <p>代价和优势，也一张表记住：</p>
+    <div style="overflow-x:auto"><table class="cmp">
+      <thead><tr><th>维度</th><th>RNN</th><th>Transformer</th></tr></thead>
+      <tbody>
+        <tr><td>能不能并行</td><td><span class="no">不行，得一个个读</span></td><td><span class="yes">能，全并行</span></td></tr>
+        <tr><td>两个词的“距离”</td><td><span class="no">隔得远就难连</span></td><td><span class="yes">任意两词一步直达</span></td></tr>
+        <tr><td>代价</td><td>尚可</td><td><span class="no">n² 增长，长文本吃紧</span></td></tr>
+      </tbody>
+    </table></div>
+    <p>一句话总结：<span class="hl">Transformer 用“更高的复杂度上限”，换来了“完全并行 + 任意两词一步直达”</span>。GPU 时代，这个交换很划算。</p>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p>点下面三个按钮，看每种注意力的 Q、K、V 分别从哪来。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 三种注意力，点开看</span>
+        <span class="seg" id="attnSeg"><button data-a="0" class="on">编码器自注意力</button><button data-a="1">解码器掩码</button><button data-a="2">交叉注意力</button></span>
+      </div>
+      <div class="card-b" id="attnInfo"></div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 依次点三个按钮，确认每种注意力“Q 从哪、K/V 从哪”。<br>2. 合上资料，能不能自己说出三种注意力的区别？<br>3. 想一想：哪一种是“解码器独有的”（交叉注意力）？</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">交叉注意力是解码器独有的——它让解码器写译文时回头“读源句”。编码器里没有它。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>交叉注意力的 Q、K、V 从哪来？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>Q 来自解码器，K、V 来自编码器输出</span></div><div class="opt" data-a="B"><span class="k">B</span><span>Q、K、V 都来自编码器</span></div><div class="opt" data-a="C"><span class="k">C</span><span>Q、K、V 都来自解码器</span></div><div class="opt" data-a="D"><span class="k">D</span><span>Q 来自编码器，K、V 来自解码器</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。交叉注意力：解码器拿自己的 Q，去读编码器的 K、V（源句信息）。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>三种注意力，唯一的区别是什么？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>Q、K、V 从哪来</span></div><div class="opt" data-a="B"><span class="k">B</span><span>算法完全不同</span></div><div class="opt" data-a="C"><span class="k">C</span><span>用的词不一样</span></div><div class="opt" data-a="D"><span class="k">D</span><span>层数不一样</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。三种注意力算法一模一样，只有 Q、K、V 的来源不同。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>Transformer 的复杂度是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>O(n²)：n 个词要算 n×n 分数表，越长越费</span></div><div class="opt" data-a="B"><span class="k">B</span><span>O(n)：越长越省</span></div><div class="opt" data-a="C"><span class="k">C</span><span>O(1)：和长度无关</span></div><div class="opt" data-a="D"><span class="k">D</span><span>没有复杂度</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。每个 Q 都要和每个 K 比一次，n×n 次，所以 O(n²)，长文本吃紧。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>判断：Transformer 能全并行，任意两个词一步直达。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。所有词同时算（并行），任意两个词一步直达——这是它赢 RNN 的关键。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】一句话 100 个词，QKᵀ 要算多少个“分数”？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>100 个</span></div><div class="opt" data-a="B"><span class="k">B</span><span>10000 个</span></div><div class="opt" data-a="C"><span class="k">C</span><span>200 个</span></div><div class="opt" data-a="D"><span class="k">D</span><span>1 个</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B · 10000 个</strong>。100×100 = 10000。这就是 O(n²)——长度翻 10 倍，分数多 100 倍。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>三种注意力算法一样，<strong>只差 Q、K、V 从哪来</strong>（自注意力 / 掩码 / 交叉）。</li>
+        <li>交叉注意力是<strong>解码器独有</strong>：拿自己的 Q 读编码器的 K、V。</li>
+        <li>代价是 <strong>O(n²)</strong>：长文本吃紧。用复杂度换“并行 + 一步直达”。</li>
+      </ol>
+    </div>
+
+    <div class="stage-review">
+      <b>🎉 阶段 F 回顾 · 整机 + 训练，你已经全懂了</b>
+      <p>到这一关，你已经把这台机器<strong>从上到下看完了</strong>：</p>
+      <p>编码器读懂源句（F1）→ 解码器逐词写答案、掩码不偷看（F2）→ 训练=预测→对比→更新（F3）→ 三种注意力分清、代价算清（F4）。</p>
+      <p>论文《Attention Is All You Need》的核心，你已经全部学完。最后只剩阶段 G：看它通向哪里（BERT / GPT）。</p>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="从零到Transformer-学习地图.html">🎉 阶段 F 全部完成 · 回学习地图</a>
+      <div class="pending">下一站 <b>G1 · 从 Transformer 到 BERT / GPT</b>。回一句"<b>开 G1</b>"，我就把它做出来；也可以 <a href="课程-00-Transformer全景图.html" style="color:var(--violet)">回全景图看一眼“你在这里”</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · F4 · 三种注意力辨析</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='cost'
+      ? '<strong>猜对了！</strong>代价是 O(n²)：句子越长越费。这是它唯一的软肋。'
+      : '<strong>你选了“没有代价”。</strong>其实有——n 个词要算 n×n 分数，长文本吃紧。';
+  }));
+
+  const ATTNS=[
+    {name:'编码器自注意力', kv:'Q ← 源句　　K ← 源句　　V ← 源句', d:'源句里的词互相理解（没有掩码，谁都能看谁）。'},
+    {name:'解码器掩码自注意力', kv:'Q ← 已写出的词　　K ← 已写出的词　　V ← 已写出的词', d:'生成时只看自己及左边，未来被掩掉。'},
+    {name:'交叉注意力', kv:'Q ← 解码器　　K ← 编码器输出　　V ← 编码器输出', d:'解码器写译文时，回头读源句（编码器输出）。'}
+  ];
+  function show(a){
+    const A=ATTNS[a];
+    $('#attnInfo').innerHTML=`<div class="attninfo"><h4>${A.name}</h4><div class="kv">${A.kv}</div><p style="margin-top:8px">${A.d}</p></div>`;
+  }
+  $$('#attnSeg button').forEach(b=>b.addEventListener('click',()=>{$$('#attnSeg button').forEach(x=>x.classList.toggle('on',x===b));show(+b.dataset.a);}));
+  show(0);
+
+  const CORRECT={'1':'A','2':'A','3':'A','4':'T','5':'B'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！阶段 F 全部完成 🎉</h3><p>5 道全对。你已经懂：<strong>三种注意力只差 Q/K/V 来源；交叉注意力是解码器独有；代价 O(n²)</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

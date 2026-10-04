@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A3 · 矩阵乘法 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(26px,5.2vw,40px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  .seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0}.seg button+button{border-left:1px solid var(--rule-strong)}.seg button.on{background:var(--ink);color:#fff}.seg button.on:hover{color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:var(--rule-strong);outline:none;margin:9px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff}
+  .calc-wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center}
+  .mgrid{display:grid;gap:6px}
+  .mgrid .mc{width:46px;height:38px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;border:1px solid var(--rule);border-radius:7px;background:#FBFCFE}
+  .mgrid .mc.hot{background:rgba(108,92,231,.1);border-color:var(--violet);color:#3B2DB0;font-weight:700}
+  .mgrid .mc.res{background:rgba(226,62,87,.1);border-color:var(--signal);color:var(--signal);font-weight:700}
+  .mat-label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);text-align:center;margin:0 0 8px}
+  .op-sym{font-family:var(--mono);font-size:22px;color:var(--ink-faint)}
+  table.calc{border-collapse:collapse;width:100%;font-size:14px;margin-top:16px}
+  table.calc th,table.calc td{padding:8px 10px;border-bottom:1px solid var(--rule);text-align:center}
+  table.calc th{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC}
+  table.calc td:first-child{text-align:left;color:var(--ink-soft)}table.calc .num{font-family:var(--mono)}
+  table.calc tr.best td{background:rgba(47,163,107,.09)}
+  .vcol .row{display:grid;grid-template-columns:34px 1fr 28px;gap:10px;align-items:center;margin:5px 0}
+  .vcol .k{font-size:13px;color:var(--ink-soft)}.vcol .v{font-family:var(--mono);font-size:13px;text-align:right}
+  .shape{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:15px;flex-wrap:wrap}
+  .shape .bx{border:1.5px solid var(--rule-strong);border-radius:6px;padding:3px 9px;background:#FBFCFE}
+  .shape .bx.mid{border-color:var(--violet);color:var(--violet);font-weight:700}.shape .bx.out{border-color:var(--signal);color:var(--signal);font-weight:700}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">A3 · 矩阵乘法</span><span><a href="课程-A2-点积.html">← 回 A2</a> 　·　 第 3 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>一次算一堆点积——整机靠它把“谁和谁像”整张表一次算出来（注意力里的 <code>QKᵀ</code> 就是它）。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 A · 地基 · 第 3 关（最后一关）</p>
+    <h1>矩阵乘法：<br>一次算一堆“像不像”</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>上一关你会算两个向量的点积了。但一句话有很多词、两两都要比——一个个算太慢。这一关学<strong>矩阵乘法</strong>：把很多个点积<strong>打包，一次算完</strong>。学完你就懂了：注意力里的 <code>QKᵀ</code> 本质就是它。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>一个“3 行 2 列”的矩阵，去乘一个“2 个数”的向量，结果是<strong>几个数</strong>？</p>
+    <div class="guess">
+      <button data-g="2">2 个数</button>
+      <button data-g="3">3 个数</button>
+      <button data-g="6">6 个数</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先猜一个，下面“学习”里揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">先感受一下“重复劳动”的麻烦。</p>
+    <p>三个水果的 2 维向量（只记“甜、酸”）：苹果 <code>[7,2]</code>、柠檬 <code>[2,9]</code>、葡萄 <code>[9,1]</code>。现在想知道它们各自和一个“查询” <code>[1,1]</code> 像不像。照上一关的办法，要分别算三次点积：</p>
+    <p style="font-family:var(--mono);font-size:14px;line-height:1.9;margin:1em 0">苹果 · 查询 = 7×1 + 2×1 = <span class="hl">9</span><br>柠檬 · 查询 = 2×1 + 9×1 = <span class="hl">11</span><br>葡萄 · 查询 = 9×1 + 1×1 = <span class="hl">10</span></p>
+    <p>三次还行。但如果一句话 50 个词、两两都要比呢？那就是 <strong>50×50 = 2500 次</strong>点积。一个一个算，人和机器都会累。</p>
+    <p>矩阵乘法就是来解决这件事的：<span class="hl">把很多个向量“摞成”一个方块（矩阵），和另一个向量相乘，一次把所有的点积都算出来。</span></p>
+    <div class="note"><span class="tag">一句话记住</span><p>矩阵乘法 = <strong>批量的点积</strong>。它没有新的数学，只是把“一行一行做点积”这件事，一次性算完、排好队给你。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 矩阵乘法不是“把每个数都乘一遍”。</strong>它是“<strong>拿一整行，去和那一列做点积</strong>”。</p>
+      <p><strong>② 中间的两个数字必须相等，才能相乘。</strong>比如 3×2 配 2×1 可以，3×2 配 3×1 就不行。</p>
+      <p><strong>③ 它算出来的是“一排点积”，不是新花样。</strong>每一步还是上关那个“一位一位地乘、再相加”。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <div class="note"><span class="tag">先认识几个词（这一关要用到）</span>
+      <p><strong>矩阵</strong>：把一堆数字排成方方正正的“网格”，就叫矩阵。<strong>行</strong>是横着的一条，<strong>列</strong>是竖着的一条。<br>
+      <strong>“3×2”这种写法</strong>：念作“3 行 2 列”——第一个数字是行数，第二个是列数。</p>
+    </div>
+    <p>把三个水果摞成一个“方块”，得到矩阵 M（3 行 2 列）：</p>
+    <div class="calc-wrap" style="margin:1.4em 0">
+      <div><p class="mat-label">矩阵 M（3×2）</p><div class="mgrid" style="grid-template-columns:repeat(2,46px)"><div class="mc">7</div><div class="mc">2</div><div class="mc">2</div><div class="mc">9</div><div class="mc">9</div><div class="mc">1</div></div></div>
+      <span class="op-sym">×</span>
+      <div><p class="mat-label">向量 v（2×1）</p><div class="mgrid" style="grid-template-columns:46px"><div class="mc hot">1</div><div class="mc hot">1</div></div></div>
+      <span class="op-sym">=</span>
+      <div><p class="mat-label">结果（3×1）</p><div class="mgrid" style="grid-template-columns:46px"><div class="mc res">9</div><div class="mc res">11</div><div class="mc res">10</div></div></div>
+    </div>
+    <p>规则只有一句话：<span class="hl">结果的<strong>第几个数</strong>，等于矩阵<strong>第几行</strong>（从上往下数）和向量 v 的点积。</span>口诀就是——<strong>“行 × 列 = 点积”</strong>。</p>
+    <p><strong>形状必须“对上”。</strong>记这个规律，就不会错：</p>
+    <p style="text-align:center;margin:1.2em 0"><span class="shape"><span class="bx">3 × <span style="color:var(--violet)">2</span></span><span class="op-sym" style="font-size:14px">×</span><span class="bx"><span style="color:var(--violet)">2</span> × 1</span><span class="op-sym" style="font-size:14px">=</span><span class="bx out">3 × 1</span></span></p>
+    <p>两个<strong>中间的数字必须相等</strong>（这里是 2 和 2）——它们要一一配对去乘。结果的行列，就是<strong>外层的两个数字</strong>（3 和 1）。</p>
+    <div class="note"><span class="tag">跟着走一遍（也回答你的“先猜”）</span><p>3×2 的矩阵乘 2×1 的向量，结果是 <strong>3 个数</strong>（一个 3×1 的向量）——不是 6 个。矩阵有几行，结果就有几个数。你猜的是 3 吗？</p></div>
+    <div class="note"><span class="tag">连到注意力</span><p>一句话里每个词都有自己的 Q 和 K。把所有 Q 摞成矩阵、所有 K 摞成矩阵，让它们相乘，就相当于让<strong>每一个 Q 和每一个 K 都做一次点积</strong>，一次算出“谁和谁像”的整张表。（写成 <code>QKᵀ</code> 里那个小 <code>ᵀ</code> 叫“转置”，是把 K 的矩阵横竖翻一下，好让形状对得上。）</p></div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：把向量 v 从 <code>[1,1]</code> 改成只盯“甜”的 <code>[10,0]</code>，哪个水果会变成“最像的”（绿色那行）？先猜，再拖。</p>
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 矩阵 × 向量 = 一批点积</span><span class="seg" id="presets"><button data-p="0" class="on">水果</button><button data-p="1">词的向量</button></span></div>
+      <div class="card-b">
+        <div class="calc-wrap">
+          <div><p class="mat-label">矩阵 M</p><div class="mgrid" id="mgrid" style="grid-template-columns:repeat(2,46px)"></div></div>
+          <span class="op-sym">×</span>
+          <div><p class="mat-label">向量 v</p><div class="mgrid" id="vgrid" style="grid-template-columns:46px"></div><div class="vcol" style="margin-top:10px;border:none;background:none;padding:0" id="vsliders"></div></div>
+          <span class="op-sym">=</span>
+          <div><p class="mat-label">结果</p><div class="mgrid" id="rgrid" style="grid-template-columns:46px"></div></div>
+        </div>
+        <table class="calc" id="calcTable"></table>
+        <p class="cap" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:12px;text-align:center">绿色那行 = 和 v 最像的那个向量。</p>
+      </div>
+    </div>
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 用计算器算出：v = <code>[1,1]</code> 时三个得分是多少？<br>2. 把 v 拖成 <code>[10,0]</code>（只看“甜”），这时最像的是谁？和你想的一样吗？<br>3. 纸笔算一遍 <code>[[1,2],[3,4],[5,6]] × [1,1]</code>，再点下面核对。</p>
+      <details class="reveal" style="margin-top:12px"><summary>核对第 3 题</summary><div class="ans">每行和 [1,1] 做点积：1×1+2×1=<strong>3</strong>，3×1+4×1=<strong>7</strong>，5×1+6×1=<strong>11</strong>。结果 <strong>[3, 7, 11]</strong>（3 个数）。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 4 道题都选好，再点“提交答案 · 判分”。<strong>4 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>一句话有 8 个词。把所有 Q、所有 K 摞成矩阵相乘，一共得到多少个“得分”？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>8 个</span></div><div class="opt" data-a="B"><span class="k">B</span><span>16 个</span></div><div class="opt" data-a="C"><span class="k">C</span><span>64 个</span></div><div class="opt" data-a="D"><span class="k">D</span><span>没法确定</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>C · 64 个</strong>。8 个 Q，每个都要和 8 个 K 比一次，所以 8×8=64，排成一张 8×8 的表。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>两个东西相乘时，为什么“中间的两个数字”必须相等？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>因为要把一个的每一“行”和另一个的每一“列”一一配对去乘，数量一样才配得上</span></div><div class="opt" data-a="B"><span class="k">B</span><span>因为相等的数字算起来更快</span></div><div class="opt" data-a="C"><span class="k">C</span><span>没什么道理，只是人为规定的</span></div><div class="opt" data-a="D"><span class="k">D</span><span>不相等也能乘，只是结果不准</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。矩阵乘法就是“拿一行的每个数，和另一列的每个数逐位配对相乘”。个数不一样，就有数配不到伴，没法一一对应地做点积。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：<code>QKᵀ</code> 就是把所有词的 Q 和所有词的 K 两两比一遍，一次算出全部得分。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。让所有 Q 和所有 K 相乘，就等于让每个 Q 和每个 K 都做一次点积，一次把分数全算出来。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>【用得上】一个 <code>(2×3)</code> 的矩阵，乘一个“3 个数”的向量，结果是几行几列？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>2 行 1 列</span></div><div class="opt" data-a="B"><span class="k">B</span><span>3 行 1 列</span></div><div class="opt" data-a="C"><span class="k">C</span><span>2 行 3 列</span></div><div class="opt" data-a="D"><span class="k">D</span><span>不能相乘</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A · 2 行 1 列</strong>。向量 3 个数 = 3×1，中间 3=3 能对上；结果取外层：2 行、1 列。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>矩阵乘法 = <strong>批量的点积</strong>：拿一整行去和那一列做点积。</li>
+        <li>形状要“中间对齐”：<strong>前一个的列数 = 后一个的行数</strong>，结果取外层。</li>
+        <li>注意力里的 <code>QKᵀ</code> 就是它：一次把“谁和谁像”的整张表算出来。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="从零到Transformer-学习地图.html">🎉 过关 · 回学习地图</a>
+      <div class="pending">阶段 A 全部完成！下一站 <b>B1 · 从词到向量（词嵌入）</b>。<a href="课程-B1-从词到向量.html" style="color:var(--violet)">在新窗口打开 B1</a>（或在聊天里回一句"<b>开 B1</b>"）；也可以 <a href="课程-A2-点积.html" style="color:var(--violet)">回 A2 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · A3 · 矩阵乘法</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='3'
+      ? '<strong>猜对了！</strong>结果是 3 个数（矩阵有几行，结果就有几个数）。'
+      : '<strong>你猜“'+b.textContent+'”。</strong>继续看下去，答案在“学习”里揭晓——其实是 3 个数。';
+  }));
+
+  const PRESETS=[
+    {rows:[['苹果',[7,2]],['柠檬',[2,9]],['葡萄',[9,1]]]},
+    {rows:[['词1',[1,2]],['词2',[3,1]],['词3',[0,2]]]}
+  ];
+  let pi=0, P=PRESETS[0], v=[1,1];
+  function render(){
+    $('#mgrid').innerHTML=P.rows.map(r=>`<div class="mc">${r[1][0]}</div><div class="mc">${r[1][1]}</div>`).join('');
+    $('#vgrid').innerHTML=v.map(x=>`<div class="mc hot">${x}</div>`).join('');
+    const res=P.rows.map(r=>r[1][0]*v[0]+r[1][1]*v[1]);
+    const maxv=Math.max.apply(null,res);
+    $('#rgrid').innerHTML=res.map(x=>`<div class="mc res">${x}</div>`).join('');
+    $('#vsliders').innerHTML=[0,1].map(i=>`<div class="row"><span class="k">v${i+1}</span><input type="range" min="0" max="10" value="${v[i]}" data-i="${i}"><span class="v" data-v="${i}">${v[i]}</span></div>`).join('');
+    $$('#vsliders input').forEach(r=>r.addEventListener('input',e=>{v[+e.target.dataset.i]=+e.target.value;render();}));
+    let rows='<thead><tr><th>行（哪个向量）</th><th>这一行 · v 的计算</th><th>得分</th></tr></thead><tbody>';
+    P.rows.forEach((r,i)=>{const s=r[1][0]*v[0]+r[1][1]*v[1];rows+=`<tr class="${s===maxv?'best':''}"><td>${r[0]}　[${r[1][0]}, ${r[1][1]}]</td><td class="num">${r[1][0]}×${v[0]} + ${r[1][1]}×${v[1]}</td><td class="num" style="font-weight:700">${s}</td></tr>`;});
+    $('#calcTable').innerHTML=rows+'</tbody>';
+  }
+  $$('#presets button').forEach(b=>b.addEventListener('click',()=>{pi=+b.dataset.p;P=PRESETS[pi];$$('#presets button').forEach(x=>x.classList.toggle('on',x===b));render();}));
+  render();
+
+  const CORRECT={'1':'C','2':'A','3':'T','4':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===4){h=`<h3>✅ 过关！阶段 A 全部完成 🎉</h3><p>4 道全对。你已经打通地基：<strong>向量 → 点积 → 矩阵乘法（一次算一堆点积）</strong>——后面注意力全靠这三样。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='4 / 4 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 4 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

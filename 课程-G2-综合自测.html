@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G2 · 综合自测 · 毕业 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  .journey{display:flex;flex-direction:column;gap:8px;max-width:520px;margin:0 auto}
+  .jstep{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--rule);border-radius:10px;padding:10px 14px;background:#FBFCFE}
+  .jstep .jid{font-family:var(--serif);font-weight:800;font-size:16px;color:var(--signal);flex:none;width:24px}
+  .jstep .jtxt{font-size:13.5px;color:var(--ink-soft)}
+  .jstep .jtxt b{color:var(--ink)}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .graduate{background:var(--ink);color:#fff;border-radius:16px;padding:28px 26px;margin-top:26px;box-shadow:var(--shadow);text-align:center}
+  .graduate .big{font-family:var(--serif);font-size:clamp(24px,4vw,32px);font-weight:800;color:#fff;margin:0 0 10px}
+  .graduate p{margin:0 0 8px;color:#C7D0E4;font-size:15px}
+  .graduate .line{font-family:var(--mono);font-size:13px;color:#9FB0D0;line-height:2;margin-top:12px}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">G2 · 综合自测</span><span><a href="课程-G1-BERT与GPT.html">← 回 G1</a> 　·　 第 23 关 / 共 23 关 · 约 30 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>最后一关：把<strong>整门课串成一条线</strong>，再考你一次综合题。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 G · 出路 · 第 2 关（最后一关）</p>
+    <h1>综合自测：<br>把整门课串成一条线</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>这是期末考。前面 22 关是零件，这关把它们<strong>串成一条完整的线</strong>，再用一道综合题检验。过了这关，你就从零基础<strong>出师</strong>了。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 学习 → 实践 → 检核 → 毕业</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（最后一道开胃题）</h2><span class="en">Guess first</span></div>
+    <p>从“一个词”到“读懂整句的机器”，中间你学过的<strong>最核心的一个动作</strong>是哪一个？</p>
+    <div class="guess">
+      <button data-g="att">注意力（让词之间互相看）</button>
+      <button data-g="softmax">softmax</button>
+      <button data-g="ffn">FFN</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解：全课程主线 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：全课程的一条线</h2><span class="en">Understand</span></div>
+    <p class="lead">这 23 关，其实是一条线。合上眼睛，跟着走一遍：</p>
+    <div class="journey" id="journey"></div>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>注意力</strong>”。它正是这门课名字的由来——Attention Is All You Need（你需要的只是注意力）。你猜对了吗？</p></div>
+  </section>
+
+  <!-- 学习：综合案例 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：一道综合案例</h2><span class="en">Learn</span></div>
+    <p class="lead">把整门课用起来，答一道真实的题。</p>
+    <p>某公司要把一批<strong>很长、术语很多</strong>的中文合同机器翻译成英文。有人建议改用“一个一个词往后读”的老办法（RNN）。你学了这么多，会怎么分析？</p>
+    <div class="note"><span class="tag">对照着看</span>
+      <p><strong>① 长句</strong> → 需要强的“长距离依赖”能力 → Transformer 任意两词一步直达，RNN 隔得远就丢。<br>
+      <strong>② 术语要对齐</strong> → 需要“源句↔译文”的显式对齐 → Transformer 的交叉注意力天生干这个。<br>
+      <strong>③ 数据量可能有限</strong> → 可以用现成的预训练 Transformer 微调（BERT/GPT 那套）。</p>
+      <p>结论：<strong>选 Transformer 架构</strong>，用预训练模型微调；纯 RNN 不建议。若句子极长，再补长上下文优化。</p>
+    </div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：动手默写这条线</h2><span class="en">Practice</span></div>
+    <p>这是唯一的“动手题”，但<strong>不用打字</strong>——闭上眼，心里默念下面这条链，看能不能<strong>不看提示背出来</strong>：</p>
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>整门课 = 一句话</span></div>
+      <div class="card-b">
+        <p style="font-family:var(--mono);font-size:14px;line-height:2;text-align:center;margin:0">
+          词 → 一串数 → 互相打分 → 按权重取内容 → 拼成一层 → 堆 6 层 → 训出来
+        </p>
+      </div>
+    </div>
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 不看屏幕，把这句链背一遍。<br>2. 展开成完整版：词→向量(A/B) → 注意力(注意力=Q比K打分÷√dₖ softmax×V) (C/D) → 多头+位置+残差+FFN (E) → 编码器×6/解码器+掩码 (F) → BERT/GPT (G)。<br>3. 背得出来，就真的出师了。</p>
+      <details class="reveal" style="margin-top:12px"><summary>看完整版</summary><div class="ans">词 → 向量（A1–B2）→ 注意力=QKᵀ÷√dₖ softmax ×V（C1–D5）→ 多头/位置编码/残差/FFN（E1–E4）→ 编码器×6、解码器+掩码、训练（F1–F4）→ BERT/GPT（G1）。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：期末考（过关标准）</h2><span class="en">Check</span></div>
+    <p>5 道综合题，贯穿全课程。<strong>5 道全对，你就毕业了</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>完整公式 <code>attention(Q,K,V) = softmax(QKᵀ/√dₖ)·V</code> 里，÷√dₖ 的作用是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>把分数拉回正常范围，防止 softmax 押死</span></div><div class="opt" data-a="B"><span class="k">B</span><span>让分数变大</span></div><div class="opt" data-a="C"><span class="k">C</span><span>给词排序</span></div><div class="opt" data-a="D"><span class="k">D</span><span>补位置信息</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。维度越高分数越极端，÷√dₖ 稳住数值、防 softmax 饱和。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>编码器一层 = 哪两样（各带残差+Norm）？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>多头注意力 + FFN</span></div><div class="opt" data-a="B"><span class="k">B</span><span>位置编码 + softmax</span></div><div class="opt" data-a="C"><span class="k">C</span><span>词嵌入 + 掩码</span></div><div class="opt" data-a="D"><span class="k">D</span><span>Q + K + V</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。编码器一层 = 多头注意力 + FFN，各带残差和 LayerNorm。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：解码器比编码器多一个“交叉注意力”，且自注意力带掩码。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。解码器 = 掩码自注意力 + 交叉注意力 + FFN。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>位置编码解决的是什么问题？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>注意力不认顺序，补上“谁在前谁在后”</span></div><div class="opt" data-a="B"><span class="k">B</span><span>让模型变快</span></div><div class="opt" data-a="C"><span class="k">C</span><span>减少参数</span></div><div class="opt" data-a="D"><span class="k">D</span><span>防止过拟合</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。注意力是“词袋”，分不清“猫追狗/狗追猫”，位置编码补顺序。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【综合案例】长合同翻译，为什么不建议用“一个一个词往后读”的 RNN？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>长句里隔得远的词，RNN 容易传丢，且没法并行、训练慢</span></div><div class="opt" data-a="B"><span class="k">B</span><span>RNN 不能读中文</span></div><div class="opt" data-a="C"><span class="k">C</span><span>RNN 会漏掉标点</span></div><div class="opt" data-a="D"><span class="k">D</span><span>RNN 只能用英文</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。RNN 串行、长依赖会衰减，长句术语容易跑偏；Transformer 并行 + 一步直达 + 交叉注意力对齐。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="graduate">
+      <p class="big">🎓 你毕业了</p>
+      <p>从“电脑为什么要把词变成数字”，一路走到“看懂《Attention Is All You Need》”——23 关，你走完了。</p>
+      <p class="line">词 → 一串数 → 互相打分 → 按权重取内容<br>→ 拼成一层 → 堆 6 层 → 训出来 → BERT / GPT</p>
+      <p style="margin-top:12px">往后，你可以去读原论文、跑一个 mini Transformer、或去看 ViT（视觉 Transformer）——它们的骨架，就是你学过的这些东西。</p>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="从零到Transformer-学习地图.html">🏁 全部完成 · 回学习地图（勾满 23 关）</a>
+      <div class="pending">建议回去 <a href="课程-00-Transformer全景图.html" style="color:var(--violet)">看一遍全景图</a>，或 <a href="Transformer原理精讲.html" style="color:var(--violet)">翻翻复习手册</a>，把整门课再串一遍。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · G2 · 综合自测（最后一关）</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='att'
+      ? '<strong>猜对了！</strong>注意力是这门课的核心——论文标题就是它（Attention Is All You Need）。'
+      : '<strong>再想想。</strong>其实最核心的是“注意力”——所有零件都围着它转。';
+  }));
+
+  const JOURNEY=[
+    {id:'A',t:'词和东西变成<strong>一串数</strong>（向量），比像不像用<strong>点积</strong>。'},
+    {id:'B',t:'每个<strong>词</strong>是一串数，意思近的数字串也近（词嵌入）。'},
+    {id:'C',t:'注意力=<strong>开会</strong>：每个词按权重（100%）去看别的词。'},
+    {id:'D',t:'注意力怎么算：<strong>QKᵀ ÷√dₖ softmax ×V</strong>。'},
+    {id:'E',t:'武装它：<strong>多头</strong>多角度、<strong>位置编码</strong>补顺序、<strong>残差+Norm</strong>稳训练、<strong>FFN</strong>逐词加工。'},
+    {id:'F',t:'拼成整机：<strong>编码器×6</strong>读懂、<strong>解码器+掩码</strong>逐词写、训练=预测→对比→更新。'},
+    {id:'G',t:'出路：<strong>BERT</strong>用编码器（读懂）、<strong>GPT</strong>用解码器（生成）。'}
+  ];
+  $('#journey').innerHTML=JOURNEY.map(j=>`<div class="jstep"><span class="jid">${j.id}</span><span class="jtxt">${j.t}</span></div>`).join('');
+
+  const CORRECT={'1':'A','2':'A','3':'T','4':'A','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 满分毕业！🎓</h3><p>5 道综合题全对——你把整门课串起来了。从“词变成数字”到“看懂 Transformer”，你出师了。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对 · 毕业';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>还差一点点</h3><p>改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul><p style="margin-top:8px">建议回去翻翻 <a href="课程-00-Transformer全景图.html" style="color:var(--violet)">全景图</a> 再试。</p>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

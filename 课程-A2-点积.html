@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A2 · 点积 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);
+    background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);
+    background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}
+  .topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}
+  .goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}
+  .hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:var(--rule-strong);outline:none;margin:9px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff}
+  .fr{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}
+  .fruit{display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--rule-strong);border-radius:10px;background:#FBFCFE;cursor:pointer;font-size:14.5px;font-weight:600;color:var(--ink);transition:.14s}
+  .fruit .sw{width:13px;height:13px;border-radius:4px}.fruit.on{border-color:var(--ink);box-shadow:0 0 0 2px rgba(14,26,50,.08)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:22px}@media(max-width:620px){.two{grid-template-columns:1fr}}
+  .vcol{background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:14px 16px}
+  .vcol h4{margin:0 0 10px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+  .vcol .row{display:grid;grid-template-columns:44px 1fr 30px;gap:10px;align-items:center;margin:5px 0}
+  .vcol .k{font-size:13px;color:var(--ink-soft)}.vcol .v{font-family:var(--mono);font-size:13px;text-align:right}
+  table.calc{border-collapse:collapse;width:100%;font-size:14px;margin-top:6px}
+  table.calc th,table.calc td{padding:8px 10px;border-bottom:1px solid var(--rule);text-align:center}
+  table.calc th{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);background:#F4F7FC}
+  table.calc td:first-child{text-align:left;color:var(--ink-soft)}table.calc .num{font-family:var(--mono)}
+  table.calc tr.total td{border-top:2px solid var(--rule-strong);border-bottom:none;font-weight:700}table.calc tr.total td:first-child{color:var(--ink)}
+  .verdict{margin-top:16px;padding:14px 16px;border-radius:10px;background:rgba(108,92,231,.06);border:1px solid rgba(108,92,231,.25);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .verdict .big{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--violet)}.verdict .txt{font-size:14.5px;color:var(--ink-soft)}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">A2 · 点积</span><span><a href="课程-A1-什么是向量.html">← 回 A1</a> 　·　 第 2 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>比较两个词“像不像”——整机“改写一张表”时，每个词就是靠它去量“和别的词有多像”。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 A · 地基 · 第 2 关</p>
+    <h1>点积：<br>两个向量怎么算“像不像”</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>上一关我们把东西变成了数字串（向量）。这关要回答：<strong>两串数字摆在一起，怎么算出它俩像不像？</strong>你会学一个动作叫“点积”。它正是后面“注意力”最核心的一步。用纸笔就行。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>有苹果 <code>[7, 2, 6]</code>、葡萄 <code>[9, 1, 2]</code>、柠檬 <code>[2, 9, 4]</code>。凭感觉猜：下面三对里，哪一对“最像”？</p>
+    <div class="guess">
+      <button data-g="a">苹果 · 葡萄</button>
+      <button data-g="b">苹果 · 柠檬</button>
+      <button data-g="c">葡萄 · 柠檬</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（记着你的选择，下面会用“点积”算出真正的答案。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">先问一个很具体的问题。</p>
+    <p>上一关把水果变成了数字串：苹果 <code>[7, 2, 6]</code>、葡萄 <code>[9, 1, 2]</code>。现在问：<strong>苹果和葡萄，像不像？</strong>光盯着六个数字，很难说清，更给不出一个“分数”。</p>
+    <p>我们需要一个能算出“像不像分数”的笨办法。它简单得出奇，叫 <span class="hl">点积</span>：把两串数字<strong>一位对一位地乘起来，再把乘出来的结果全加起来</strong>。</p>
+    <p style="text-align:center;font-family:var(--mono);font-size:15px;line-height:2;margin:1.3em 0">
+      苹果 [7, 2, 6]　和　葡萄 [9, 1, 2]<br>
+      7×9 = <span class="hl">63</span>　　2×1 = <span class="hl">2</span>　　6×2 = <span class="hl">12</span><br>
+      再加起来：63 + 2 + 12 = <strong>77</strong>
+    </p>
+    <p>这个 <strong>77</strong>，就是苹果和葡萄的“点积”。再换两对算算：苹果·柠檬 = 14+18+24 = <strong>56</strong>；葡萄·柠檬 = 18+9+8 = <strong>35</strong>。</p>
+    <p>三个数排一排：苹果·葡萄 = 77，苹果·柠檬 = 56，葡萄·柠檬 = 35。<span class="hl">77 最大，正好是“苹果和葡萄最像”</span>（俩都又甜又不酸）；35 最小，正好是“葡萄和柠檬最不像”（一个甜一个酸）。数字自己把“像不像”讲出来了。</p>
+    <div class="note"><span class="tag">一句话记住</span><p>点积 = <strong>一位一位地乘，再全部加起来</strong>，得到一个数。这个数越大，两个向量就越“像”；越小（哪怕变成负数），就越“不像”。</p></div>
+    <div class="note"><span class="tag">回到“先猜”</span><p>如果你猜的是“苹果 · 葡萄”，你猜对了——它俩的点积最大（77）。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 点积算出来是“一个数”，不是“一串数”。</strong>两串数字进去，一个数字出来——这个数就是“像不像分数”。</p>
+      <p><strong>② 点积大，不一定等于“更像我”</strong>。它还受“数字大小、数字串多长”影响：方向差不多但整体更大的，点积也会更大。所以严格说，它衡量的是“合拍程度 × 大小”。（后面注意力的“缩放”，就是为了抵消“数字串太长”带来的影响。）</p>
+      <p><strong>③ 点积 = 0，不等于“完全不认识”。</strong>意思是“互相抵消了”，大致是“没什么关系”。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>把刚才的动作写成式子：</p>
+    <p style="text-align:center;font-family:var(--mono);font-size:16px;margin:1.1em 0">a · b　=　a₁b₁ + a₂b₂ + … + aₙbₙ</p>
+    <p>念作“a 点 b”。别怕这串符号，它说的就一句话：<strong>第 1 位乘第 1 位，第 2 位乘第 2 位，……最后全加起来</strong>。两串数字的个数要一样，才配得上。</p>
+    <p>算出来的这个数，怎么理解？记住三种情况：</p>
+    <ul>
+      <li><strong>是个挺大的正数</strong> → 两串数字老是“一起大”，很合拍，<span class="hl">很像</span>。</li>
+      <li><strong>差不多是 0</strong> → 你大我小、你正我负，抵消了，<span class="hl">基本没关系</span>。</li>
+      <li><strong>是负数</strong> → 老是“一个正一个负”，对着干，<span class="hl">很不像</span>。</li>
+    </ul>
+    <p>为什么“乘起来再相加”能看出像不像？这么想：如果两串数字在<strong>同一个位置上</strong>都偏大，乘出来就是个大正数，加进去贡献大；要是一个大一个小甚至一正一负，乘出来就小、甚至为负，反而把总分往下拉。越合拍，总分越高。</p>
+    <div class="note"><span class="tag">一个特例，很有用</span><p>一个向量和<strong>它自己</strong>做点积，等于把它每个数平方再加起来，结果一定是正数，而且很大——因为它和自己“最合拍”。（D 阶段的自注意力会用到。）</p></div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：把右边的 B 换成 A 的“反方向”（比如 A 是 <code>[7,2,6]</code>，B 换成 <code>[-7,-2,-6]</code>），它俩的点积会变成“正”还是“负”？猜完再拖。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 亲手算一次点积</span><span id="liveEq">苹果 · 葡萄</span></div>
+      <div class="card-b">
+        <div class="two">
+          <div class="vcol"><h4>向量 A</h4><div class="fr" id="frA"></div><div id="slA"></div></div>
+          <div class="vcol"><h4>向量 B</h4><div class="fr" id="frB"></div><div id="slB"></div></div>
+        </div>
+        <table class="calc" id="calcTable"></table>
+        <div class="verdict"><span class="big" id="dotVal">77</span><span class="txt" id="dotTxt"></span></div>
+        <p class="cap" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:12px;text-align:center">把 B 每个数都换成相反数（拖到负值），看点积变成什么。</p>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span><p>1. 用计算器核对：苹果·葡萄 = 77、苹果·柠檬 = 56、葡萄·柠檬 = 35。<br>2. 把 A、B 都设成苹果 <code>[7,2,6]</code>，看它和自己的点积（是不是正数？大不大？）。<br>3. 把 B 拖成 <code>[-7,-2,-6]</code>，看点积是不是变成了负数。</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">苹果 <code>[7,2,6]</code> 和自己点积 = 49+4+36 = <strong>89</strong>（大正数，最像自己）；和 <code>[-7,-2,-6]</code> 点积 = <strong>−89</strong>（大负数，完全对着干）。这正好印证了“正=像、负=不像”。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>算一算：<code>[1,2,3]</code> 点积 <code>[4,5,6]</code> = ？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>30</span></div><div class="opt" data-a="B"><span class="k">B</span><span>32</span></div><div class="opt" data-a="C"><span class="k">C</span><span>21</span></div><div class="opt" data-a="D"><span class="k">D</span><span>36</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B · 32</strong>。1×4=4，2×5=10，3×6=18，加起来 4+10+18 = 32。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>下面四对里，哪一对的点积<strong>最大</strong>？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>[1,0] 和 [1,0]</span></div><div class="opt" data-a="B"><span class="k">B</span><span>[1,0] 和 [0,1]</span></div><div class="opt" data-a="C"><span class="k">C</span><span>[1,0] 和 [-1,0]</span></div><div class="opt" data-a="D"><span class="k">D</span><span>[1,1] 和 [1,1]</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>D</strong>。算一下：A = 1；B = 0；C = −1；D = 1+1 = 2。D 最大——两位都是“一起大”，最合拍。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：两个向量的点积算出来是个负数，说明它俩方向相反、很不像。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。一位一位地乘，大多是“一正一负”，乘出来是负数，才会把总分拉成负的——代表对着干、不像。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>判断：一个向量和它自己算点积，结果一定是 0。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。自己和自己最合拍，结果是个挺大的正数（等于每个数平方再相加），不是 0。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】<code>[2,2]</code> 点积 <code>[3,3]</code> = ？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>6</span></div><div class="opt" data-a="B"><span class="k">B</span><span>10</span></div><div class="opt" data-a="C"><span class="k">C</span><span>12</span></div><div class="opt" data-a="D"><span class="k">D</span><span>18</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>C · 12</strong>。2×3 + 2×3 = 6 + 6 = 12。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>点积 = <strong>一位一位地乘、再全加起来</strong>，得到一个数。</li>
+        <li><strong>越大越像</strong>；接近 0 是没关系；负数是很不像。</li>
+        <li>它衡量的是“合拍程度 × 数字串多长”，所以后面注意力的缩放（÷√dₖ）会抵消“维度”带来的影响。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-A3-矩阵乘法.html">✅ 过关，进入下一关：A3 · 矩阵乘法 →</a>
+      <div class="pending">如果点不动（比如在预览小窗里），就 <a href="课程-A3-矩阵乘法.html" style="color:var(--violet)">在新窗口打开 A3</a>，或回一句"<b>开 A3</b>"；也可以 <a href="课程-A1-什么是向量.html" style="color:var(--violet)">回 A1 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · A2 · 点积</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    const pick={a:'苹果 · 葡萄',b:'苹果 · 柠檬',c:'葡萄 · 柠檬'}[b.dataset.g];
+    rev.innerHTML=`你猜了 <strong>${pick}</strong>。先记着，下面“理解”里用点积算出来对比——真正最大的那对是 <strong>苹果 · 葡萄（77）</strong>。`;
+  }));
+
+  const DIMS=['甜度','酸度','大小'];
+  const FRUITS=[{name:'苹果',color:'#E23E57',v:[7,2,6]},{name:'柠檬',color:'#F2B23E',v:[2,9,4]},{name:'葡萄',color:'#6C5CE7',v:[9,1,2]}];
+  let Av=FRUITS[0].v.slice(), Bv=FRUITS[2].v.slice(), aidx=0,bidx=2;
+  function sel(which){const host=$('#'+which);host.innerHTML=FRUITS.map((f,i)=>`<button class="fruit" data-f="${i}"><span class="sw" style="background:${f.color}"></span>${f.name}</button>`).join('');
+    $$('.fruit',host).forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.f;if(which==='frA'){aidx=i;Av=FRUITS[i].v.slice();}else{bidx=i;Bv=FRUITS[i].v.slice();}$$('.fruit',host).forEach(x=>x.classList.toggle('on',x===b));buildSliders();render();}));
+    $$('.fruit',host).forEach((b,i)=>b.classList.toggle('on',i===(which==='frA'?aidx:bidx)));}
+  function buildSliders(){
+    $('#slA').innerHTML=DIMS.map((d,i)=>`<div class="row"><span class="k">${d}</span><input type="range" min="-10" max="10" value="${Av[i]}" data-w="A" data-i="${i}"><span class="v" data-wa="${i}">${Av[i]}</span></div>`).join('');
+    $('#slB').innerHTML=DIMS.map((d,i)=>`<div class="row"><span class="k">${d}</span><input type="range" min="-10" max="10" value="${Bv[i]}" data-w="B" data-i="${i}"><span class="v" data-wb="${i}">${Bv[i]}</span></div>`).join('');
+    $$('input[data-w]').forEach(r=>r.addEventListener('input',e=>{const w=e.target.dataset.w,i=+e.target.dataset.i,v=+e.target.value;if(w==='A'){Av[i]=v;$(`[data-wa="${i}"]`).textContent=v;}else{Bv[i]=v;$(`[data-wb="${i}"]`).textContent=v;}render();}));}
+  function render(){
+    let dot=0;let rows='<thead><tr><th>位</th><th>A</th><th>B</th><th>A × B</th></tr></thead><tbody>';
+    for(let i=0;i<3;i++){const p=Av[i]*Bv[i];dot+=p;rows+=`<tr><td>${DIMS[i]}</td><td class="num">${Av[i]}</td><td class="num">${Bv[i]}</td><td class="num">${p}</td></tr>`;}
+    rows+=`<tr class="total"><td>点积 A · B</td><td colspan="3" class="num" style="color:var(--violet);font-size:16px">${dot}</td></tr></tbody>`;
+    $('#calcTable').innerHTML=rows;$('#dotVal').textContent=dot;
+    let txt;if(dot>0)txt='点积是正数 → 两串数字大体合拍，<strong>有相似</strong>。数越大越像。';else if(dot===0)txt='点积是 0 → 两串数字基本<strong>没关系</strong>。';else txt='点积是负数 → 两串数字对着干，<strong>很不像</strong>。';
+    $('#dotTxt').innerHTML=txt;
+    const an=$$('.fruit',$('#frA')).find(x=>x.classList.contains('on')),bn=$$('.fruit',$('#frB')).find(x=>x.classList.contains('on'));
+    $('#liveEq').textContent=(an?an.textContent.trim():'A')+' · '+(bn?bn.textContent.trim():'B');}
+  sel('frA');sel('frB');buildSliders();render();
+
+  const CORRECT={'1':'B','2':'D','3':'T','4':'F','5':'C'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经掌握“点积 = 一位一位地乘、再全加起来，越大越像”。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>

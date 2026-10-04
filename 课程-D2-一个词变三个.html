@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D2 · 一个词变三个 —— 从零到 Transformer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#EDF1F8; --panel:#FFFFFF;
+    --ink:#0E1A32; --ink-soft:#56617E; --ink-faint:#8A94AC;
+    --rule:#D5DEEC; --rule-strong:#B9C6DC;
+    --signal:#E23E57; --violet:#6C5CE7; --teal:#0E9AA7; --amber:#F2B23E; --good:#2FA36B;
+    --shadow:0 1px 0 rgba(14,26,50,.04),0 12px 34px -20px rgba(14,26,50,.4);
+    --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",Georgia,serif;
+    --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"SFMono-Regular","JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);background-image:radial-gradient(rgba(120,140,180,.13) 1px, transparent 1px);background-size:22px 22px;line-height:1.78;font-size:16.5px;-webkit-font-smoothing:antialiased}
+  ::selection{background:rgba(226,62,87,.18)}
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(237,241,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .topbar .in{max-width:760px;margin:0 auto;padding:9px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .topbar .lv{color:var(--signal);font-weight:700}
+  .topbar a{color:var(--ink-faint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}.topbar a:hover{color:var(--signal)}
+  .locate{background:rgba(108,92,231,.08);border-bottom:1px solid var(--rule);font-size:13.5px;color:var(--ink-soft)}
+  .locate .in{max-width:760px;margin:0 auto;padding:10px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .locate .pin{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);font-weight:700;flex:none}
+  .locate a{color:var(--violet);text-decoration:none;border-bottom:1px solid rgba(108,92,231,.4);white-space:nowrap}
+  .page{max-width:760px;margin:0 auto;padding:0 22px 90px}
+  header.hero{padding:clamp(28px,5vw,48px) 0 8px}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .kicker::before{content:"";width:24px;height:1px;background:var(--signal)}
+  h1{margin:0;font-family:var(--serif);font-weight:800;font-size:clamp(27px,5.4vw,42px);line-height:1.14;letter-spacing:-.01em}
+  .goal{background:var(--panel);border:1px solid var(--rule);border-left:4px solid var(--signal);border-radius:0 12px 12px 0;padding:16px 20px;margin:22px 0 6px;box-shadow:var(--shadow)}
+  .goal b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:6px}
+  .goal p{margin:0;font-size:15.5px;color:var(--ink-soft)}.goal .meta{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:10px}
+  section.step{margin:clamp(36px,6vw,56px) 0 0;scroll-margin-top:64px}
+  .sh{display:flex;align-items:baseline;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--rule);margin-bottom:20px}
+  .sh .num{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--signal);flex:none}
+  .sh h2{margin:0;font-size:clamp(19px,3vw,24px);font-family:var(--serif);font-weight:700}
+  .sh .en{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center}
+  p{margin:0 0 1.1em}.lead{font-size:1.1em;color:var(--ink-soft)}strong{color:var(--ink)}.hl{color:var(--signal);font-weight:700}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(108,92,231,.09);color:#42309E;padding:2px 6px;border-radius:4px}
+  ul{padding-left:1.25em;margin:0 0 1.1em}li{margin:.35em 0}
+  .note{border-left:3px solid var(--violet);background:rgba(108,92,231,.055);padding:14px 18px;margin:1.4em 0;border-radius:0 8px 8px 0}
+  .note .tag{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);display:block;margin-bottom:5px;font-weight:600}
+  .note p{margin:0;font-size:15px;color:var(--ink-soft)}.note p+p{margin-top:.5em}
+  .note.warn{border-left-color:var(--amber);background:rgba(242,178,62,.11)}.note.warn .tag{color:#9A6E10}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;margin:1.6em 0}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg,#FBFCFE,#F4F7FC);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .card-h .dot{width:7px;height:7px;border-radius:50%;background:var(--signal);display:inline-block;margin-right:8px;vertical-align:1px}
+  .card-b{padding:20px}
+  button,.btn{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 14px;cursor:pointer;transition:.14s;line-height:1.2}
+  button:hover{border-color:var(--signal);color:var(--signal)}button:active{transform:translateY(1px)}
+  button.primary{background:var(--signal);border-color:var(--signal);color:#fff}button.primary:hover{background:#CB3049;color:#fff}
+  :focus-visible{outline:2px solid var(--violet);outline-offset:2px;border-radius:4px}
+  .guess{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+  .guess button{font-size:15px;padding:11px 18px}
+  .guess .rev{margin-top:12px;font-size:14.5px;color:var(--ink-soft);display:none}.guess .rev.show{display:block}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:var(--rule-strong);outline:none;margin:9px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--signal);cursor:pointer;border:2px solid #fff}
+  .xrow{display:grid;grid-template-columns:44px 1fr 30px;gap:10px;align-items:center;margin:6px 0;max-width:320px}
+  .xrow .k{font-size:13.5px;color:var(--ink-soft)}.xrow .v{font-family:var(--mono);font-size:13px;text-align:right}
+  .tri{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:16px}
+  @media(max-width:620px){.tri{grid-template-columns:1fr}}
+  .tcol{background:#FBFCFE;border:1px solid var(--rule);border-radius:12px;padding:14px}
+  .tcol h4{margin:0 0 10px;font-family:var(--mono);font-size:13px}
+  .tcol.q h4{color:var(--signal)}.tcol.k h4{color:var(--teal)}.tcol.v h4{color:var(--violet)}
+  .mgrid{display:grid;grid-template-columns:repeat(2,40px);gap:5px;justify-content:center;margin-bottom:10px}
+  .mgrid .mc{height:34px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;border:1px solid var(--rule);border-radius:6px;background:#fff}
+  .mname{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-align:center;margin:0 0 6px}
+  .vecout{display:flex;gap:6px;justify-content:center;margin-bottom:8px}
+  .vecout .c{min-width:42px;height:34px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;border:1px solid currentColor;border-radius:6px;font-weight:700}
+  .tcol.q .vecout .c{color:var(--signal)}.tcol.k .vecout .c{color:var(--teal)}.tcol.v .vecout .c{color:var(--violet)}
+  .arith{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);text-align:center;line-height:1.6}
+  .q{border:1px solid var(--rule);border-radius:12px;background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 14px}
+  .q .qt{font-weight:700;font-size:15.5px;margin:0 0 12px;display:flex;gap:12px}
+  .q .qt .qn{font-family:var(--mono);font-size:12.5px;color:var(--signal);flex:none;padding-top:3px}
+  .q .kind{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-faint);border:1px solid var(--rule);border-radius:20px;padding:1px 9px;margin-left:8px;vertical-align:2px;font-weight:500}
+  .opts{display:flex;flex-direction:column;gap:8px;margin-bottom:4px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--rule);border-radius:9px;cursor:pointer;transition:.13s;font-size:15px}
+  .opt:hover{border-color:var(--rule-strong);background:#FBFCFE}
+  .opt .k{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);flex:none;padding-top:2px}
+  .opt.sel{border-color:var(--violet);background:rgba(108,92,231,.06)}
+  .opt.right{border-color:var(--good);background:rgba(47,163,107,.1)}.opt.right .k{color:var(--good)}
+  .opt.wrong{border-color:var(--signal);background:rgba(226,62,87,.07)}.opt.wrong .k{color:var(--signal)}
+  .reveal{margin-top:10px}
+  .reveal summary{font-size:13.5px;color:var(--violet);cursor:pointer;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}
+  .reveal summary::-webkit-details-marker{display:none}
+  .reveal summary::before{content:"▸";transition:transform .2s;display:inline-block}
+  .reveal[open] summary::before{transform:rotate(90deg)}
+  .reveal .ans{margin-top:10px;font-size:14.5px;color:var(--ink-soft);background:rgba(47,163,107,.07);border-left:3px solid var(--good);padding:12px 15px;border-radius:0 8px 8px 0}
+  .submitbar{margin:22px 0 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.submitbar .status{font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+  .result{display:none;margin-top:18px;padding:18px 20px;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow);background:var(--panel)}
+  .result.show{display:block}.result.pass{border-color:var(--good);background:rgba(47,163,107,.07)}.result.fail{border-color:var(--amber);background:rgba(242,178,62,.1)}
+  .result h3{margin:0 0 8px;font-family:var(--serif);font-size:19px}.result.pass h3{color:var(--good)}.result.fail h3{color:#9A6E10}
+  .result p{margin:0 0 8px;font-size:14.5px;color:var(--ink-soft)}.result ul{margin:6px 0 0;font-size:14.5px}
+  .takeaway{background:var(--ink);color:#fff;border-radius:16px;padding:24px 24px;margin-top:26px;box-shadow:var(--shadow)}
+  .takeaway b{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#9FB0D0;display:block;margin-bottom:10px}
+  .takeaway ol{margin:0;padding-left:1.2em;color:#E4E9F3;font-size:15px}.takeaway li{margin:.4em 0}
+  .nextlink{display:none;margin-top:18px}.nextlink.show{display:block}
+  .nextlink a.btn{display:inline-flex;align-items:center;gap:9px;text-decoration:none;background:var(--good);color:#fff;border-color:var(--good);padding:11px 18px;font-size:14.5px;border-radius:9px;font-weight:600}
+  .nextlink .pending{margin-top:12px;font-size:14px;color:var(--ink-soft);background:#FBFCFE;border:1px dashed var(--rule-strong);border-radius:10px;padding:12px 15px}.nextlink .pending b{color:var(--ink)}
+  footer{border-top:1px solid var(--rule-strong);padding:24px 22px 60px;margin-top:40px}footer .f{max-width:760px;margin:0 auto;font-size:13px;color:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="in"><span class="lv">D2 · 一个词变三个</span><span><a href="课程-D1-QKV三个角色.html">← 回 D1</a> 　·　 第 10 关 / 共 23 关 · 约 25 分钟 · <a href="课程-00-Transformer全景图.html">全景图</a></span></div></div>
+<div class="locate"><div class="in"><span class="pin">你在整机的位置</span><span>让一个词变出 <strong>Q / K / V 三个分身</strong>——靠的就是三次“向量 × 矩阵”。<a href="课程-00-Transformer全景图.html">看全景图 →</a></span></div></div>
+
+<div class="page">
+  <header class="hero">
+    <p class="kicker">阶段 D · 注意力的计算 · 第 2 关</p>
+    <h1>投影：<br>一个词怎么变成三个</h1>
+    <div class="goal">
+      <b>本关目标</b>
+      <p>上一关说每个词有 Q、K、V 三个角色。这关回答：这三个分身<strong>是怎么变出来的？</strong>答案就一个动作：<strong>拿这个词自己的向量，去乘三个不同的矩阵</strong>。用的还是 A3 学的矩阵乘法——只是这里把词向量<strong>横着放</strong>，它的每个数去乘矩阵对应的一行、再相加。</p>
+      <div class="meta">你在哪 → 先猜一猜 → 理解 → 易混点 → 学习 → 实践 → 检核 → 带走三句话</div>
+    </div>
+  </header>
+
+  <!-- 先猜一猜 -->
+  <section class="step" id="guess">
+    <div class="sh"><span class="num">?</span><h2>先猜一猜（再看答案）</h2><span class="en">Guess first</span></div>
+    <p>同一个词的向量，去乘<strong>不同的</strong>矩阵，会得到一样的结果，还是不同的结果？</p>
+    <div class="guess">
+      <button data-g="same">一样，换个矩阵没区别</button>
+      <button data-g="diff">不同，换矩阵结果就变</button>
+      <div class="rev" id="guessRev"></div>
+    </div>
+    <p style="margin-top:14px;color:var(--ink-faint);font-size:13.5px">（先选一个，下面揭晓。）</p>
+  </section>
+
+  <!-- 理解 -->
+  <section class="step" id="s1">
+    <div class="sh"><span class="num">①</span><h2>理解：这一关在说什么</h2><span class="en">Understand</span></div>
+    <p class="lead">上一关，每个词有了 Q、K、V 三个角色。那这三个分身，是从哪冒出来的？</p>
+    <p>回到源头：一个词早就有自己的<strong>一个向量</strong>（就是 B 阶段配的那串数字）。现在要拿它，变出<strong>三个用途不同</strong>的向量。怎么变？</p>
+    <p>办法很朴素：<span class="hl">拿这个词的向量，去乘三个不同的矩阵。</span>乘第一个，得到 Q；乘第二个，得到 K；乘第三个，得到 V。（它和 A3 是同一套矩阵乘法，只是词向量横着放：每个数乘矩阵对应的一行，再相加。）</p>
+    <p>就像同一块面团，用三个不同的模具压一压，压出三个不同形状的点心——面团还是那块，模具不同，出来的就不同。</p>
+    <div class="note"><span class="tag">回到“先猜”</span><p>答案是“<strong>不同</strong>”。矩阵变了，乘出来的结果就变。所以用三个不同的矩阵，就得到三个不同的向量 Q、K、V。你猜对了吗？</p></div>
+    <div class="note"><span class="tag">一句话记住</span><p>Q、K、V = <strong>同一个词的向量，分别乘三个不同的矩阵</strong>。换个矩阵，就换一种用途。</p></div>
+  </section>
+
+  <!-- 易混点 -->
+  <section class="step" id="s1b">
+    <div class="sh"><span class="num">!</span><h2>易混点：先拎清楚</h2><span class="en">Watch out</span></div>
+    <div class="note warn"><span class="tag">最容易搞混的三处</span>
+      <p><strong>① 这三个矩阵不是每个词各一套，而是全句所有词共用同一套。</strong>“猫”和“狗”用的是同样三个矩阵，只是输入的词向量不同。</p>
+      <p><strong>② 这些矩阵不是人写的，是训练“学”出来的。</strong>和词向量一样，一开始是乱数。</p>
+      <p><strong>③ “投影”只是名字，别被吓到。</strong>它就是“乘一个矩阵”的意思，没有别的玄机。</p>
+    </div>
+  </section>
+
+  <!-- 学习 -->
+  <section class="step" id="s2">
+    <div class="sh"><span class="num">②</span><h2>学习：要掌握的点</h2><span class="en">Learn</span></div>
+    <p>把动作写清楚，就三行：</p>
+    <p style="font-family:var(--mono);font-size:14.5px;line-height:2;margin:1em 0">
+      Q ＝ 词向量 × <span class="hl">W<sup>Q</sup></span>　（W<sup>Q</sup> 是“造 Q 用的矩阵”）<br>
+      K ＝ 词向量 × <span style="color:var(--teal)">W<sup>K</sup></span>　（造 K 用的矩阵）<br>
+      V ＝ 词向量 × <span style="color:var(--violet)">W<sup>V</sup></span>　（造 V 用的矩阵）
+    </p>
+    <p>三个矩阵 W<sup>Q</sup>、W<sup>K</sup>、W<sup>V</sup> 各不相同，所以同一个词向量乘出来，得到三个不同的向量。</p>
+    <div class="note"><span class="tag">跟着走一遍（小例子）</span>
+      <p>假设一个词的向量是 <code>[1, 2]</code>（只有 2 个数，好算）。用三个矩阵：</p>
+      <p>W<sup>Q</sup>＝[[1,0],[1,1]]：　Q ＝ 1×[1,0] + 2×[1,1] ＝ [1,0] + [2,2] ＝ <strong>[3, 2]</strong><br>
+         W<sup>K</sup>＝[[0,1],[1,0]]：　K ＝ 1×[0,1] + 2×[1,0] ＝ [0,1] + [2,0] ＝ <strong>[2, 1]</strong><br>
+         W<sup>V</sup>＝[[2,0],[0,1]]：　V ＝ 1×[2,0] + 2×[0,1] ＝ [2,0] + [0,2] ＝ <strong>[2, 2]</strong></p>
+      <p>看：<strong>同一个 [1,2]，乘三个不同矩阵，得到三个不同的向量</strong>。这就是“一个词变三个”。（下关就用这三个向量去算“谁和谁像”。）</p>
+    </div>
+  </section>
+
+  <!-- 实践 -->
+  <section class="step" id="s3">
+    <div class="sh"><span class="num">③</span><h2>实践：亲自动手（先猜后验）</h2><span class="en">Practice</span></div>
+    <p><strong>先猜</strong>：把词的向量两个数都拉大，Q、K、V 三个结果会一起变大吗？猜完再拖。下面是刚才那三个矩阵，拖左上的两个滑块改词向量。</p>
+
+    <div class="card">
+      <div class="card-h"><span><span class="dot"></span>动手 · 一个向量 × 三个矩阵</span><span id="xlab">词向量 = [1, 2]</span></div>
+      <div class="card-b">
+        <div id="xsliders"></div>
+        <div class="tri">
+          <div class="tcol q"><h4>Q ＝ 词向量 × W<sup>Q</sup></h4><p class="mname">W<sup>Q</sup></p><div class="mgrid" id="mq"></div><div class="vecout" id="oq"></div><div class="arith" id="aq"></div></div>
+          <div class="tcol k"><h4>K ＝ 词向量 × W<sup>K</sup></h4><p class="mname">W<sup>K</sup></p><div class="mgrid" id="mk"></div><div class="vecout" id="ok"></div><div class="arith" id="ak"></div></div>
+          <div class="tcol v"><h4>V ＝ 词向量 × W<sup>V</sup></h4><p class="mname">W<sup>V</sup></p><div class="mgrid" id="mv"></div><div class="vecout" id="ov"></div><div class="arith" id="av"></div></div>
+        </div>
+        <p class="cap" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:14px;text-align:center">算法：词向量 × 矩阵 ＝ 第一个数×矩阵第 1 行 ＋ 第二个数×矩阵第 2 行。</p>
+      </div>
+    </div>
+
+    <div class="note"><span class="tag">你的任务</span>
+      <p>1. 拖动滑块，看 Q、K、V 三个结果怎么随词向量变。<br>2. 把词向量设成 <code>[1,2]</code>，核对 Q=[3,2]、K=[2,1]、V=[2,2]，和“跟着走一遍”一致。<br>3. 想一想：如果三个矩阵改成一样的，Q、K、V 会变成什么？（那它们就没区别了——所以必须用三个不同的矩阵。）</p>
+      <details class="reveal" style="margin-top:12px"><summary>看提示</summary><div class="ans">三个结果都随词向量一起变（一般都会变大/变小）。但关键是：<strong>它们各自不同、比例也不同</strong>，因为三个矩阵不一样。要是三个矩阵相同，Q、K、V 就完全一样，那分角色就没意义了——所以必须“三个不同的矩阵”。</div></details>
+    </div>
+  </section>
+
+  <!-- 检核 -->
+  <section class="step" id="s4">
+    <div class="sh"><span class="num">④</span><h2>检核：过关标准</h2><span class="en">Check</span></div>
+    <p>先把 5 道题都选好，再点“提交答案 · 判分”。<strong>5 道全对，本关就算过</strong>。（都是点选，不用打字。）</p>
+
+    <div class="q" data-q="1">
+      <p class="qt"><span class="qn">Q1</span><span>一个词的 Q、K、V 是怎么变出来的？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>用它自己的向量，分别乘三个不同的矩阵</span></div><div class="opt" data-a="B"><span class="k">B</span><span>从词表里查三个不同的词</span></div><div class="opt" data-a="C"><span class="k">C</span><span>把它复制三份，一模一样</span></div><div class="opt" data-a="D"><span class="k">D</span><span>随机乱生成三个</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A</strong>。同一个词向量，乘三个不同的矩阵，得到 Q、K、V。</div></details>
+    </div>
+
+    <div class="q" data-q="2">
+      <p class="qt"><span class="qn">Q2</span><span>判断：这三个矩阵是每个词各准备一套，词和词都不一样。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>错</strong>。全句所有词<strong>共用同一套</strong>三个矩阵；只是输入的词向量不同，结果才不同。</div></details>
+    </div>
+
+    <div class="q" data-q="3">
+      <p class="qt"><span class="qn">Q3</span><span>判断：同一个向量乘不同的矩阵，会得到不同的结果。<span class="kind">判断题</span></span></p>
+      <div class="opts"><div class="opt" data-a="T"><span class="k">✓</span><span>对</span></div><div class="opt" data-a="F"><span class="k">✗</span><span>错</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>对</strong>。矩阵不同，乘出来的向量就不同——这正是“一个词变三个”的原理。</div></details>
+    </div>
+
+    <div class="q" data-q="4">
+      <p class="qt"><span class="qn">Q4</span><span>这些 W（矩阵）是人手写定的，还是机器学出来的？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>人手写定好的</span></div><div class="opt" data-a="B"><span class="k">B</span><span>机器训练时学出来的</span></div><div class="opt" data-a="C"><span class="k">C</span><span>全是 0</span></div><div class="opt" data-a="D"><span class="k">D</span><span>全是 1</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>B</strong>。和词向量一样，这些矩阵也是训练里学出来的，一开始是乱数。</div></details>
+    </div>
+
+    <div class="q" data-q="5">
+      <p class="qt"><span class="qn">Q5</span><span>【用得上】词向量是 <code>[1,2]</code>，用 W ＝ [[1,0],[1,1]]，得到的结果是？<span class="kind">选择题</span></span></p>
+      <div class="opts"><div class="opt" data-a="A"><span class="k">A</span><span>[3, 2]</span></div><div class="opt" data-a="B"><span class="k">B</span><span>[2, 3]</span></div><div class="opt" data-a="C"><span class="k">C</span><span>[1, 2]</span></div><div class="opt" data-a="D"><span class="k">D</span><span>[3, 3]</span></div></div>
+      <details class="reveal"><summary>看参考</summary><div class="ans">选 <strong>A · [3,2]</strong>。1×[1,0] + 2×[1,1] = [1,0] + [2,2] = [3,2]。</div></details>
+    </div>
+
+    <div class="submitbar"><button class="primary" id="submitQuiz">提交答案 · 判分</button><span class="status" id="quizStatus"></span></div>
+    <div class="result" id="quizResult"></div>
+
+    <div class="takeaway"><b>这一关，带走三句话</b>
+      <ol>
+        <li>Q、K、V = <strong>一个词自己的向量 × 三个不同的矩阵</strong>（这个动作叫“投影”）。</li>
+        <li>矩阵不同 → 结果不同，所以一个词变出三个分身。</li>
+        <li>这三个矩阵<strong>所有词共用</strong>，而且是<strong>训练学出来的</strong>。</li>
+      </ol>
+    </div>
+
+    <div class="nextlink" id="nextLink">
+      <a class="btn" href="课程-D3-打分.html">✅ 过关，进入下一关：D3 · 打分（QKᵀ）→</a>
+      <div class="pending">如果点不动（比如在预览小窗里）——D3 还没生成——回一句"<b>开 D3</b>"，我就把它做出来；也可以 <a href="课程-D1-QKV三个角色.html" style="color:var(--violet)">回 D1 复习</a>。</div>
+    </div>
+  </section>
+</div>
+
+<footer><div class="f">《从零到 Transformer》课程 · D2 · 投影：一个词变三个</div></footer>
+
+<script>
+(function(){
+  "use strict";
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  $$('.guess button').forEach(b=>b.addEventListener('click',()=>{
+    const rev=$('#guessRev');rev.classList.add('show');
+    rev.innerHTML = b.dataset.g==='diff'
+      ? '<strong>猜对了！</strong>矩阵变了，结果就变——所以三个矩阵各自不同，就得到三个不同的 Q、K、V。'
+      : '<strong>你选了“一样”。</strong>其实不是——换个矩阵，乘出来的向量就不同。这正是“一个词变三个分身”的原理。';
+  }));
+
+  const M={Q:[[1,0],[1,1]],K:[[0,1],[1,0]],V:[[2,0],[0,1]]};
+  let x=[1,2];
+  $('#xsliders').innerHTML=[0,1].map(i=>`<div class="xrow"><span class="k">x${i+1}</span><input type="range" min="0" max="5" value="${x[i]}" data-i="${i}"><span class="v" data-v="${i}">${x[i]}</span></div>`).join('');
+  $$('#xsliders input').forEach(r=>r.addEventListener('input',e=>{x[+e.target.dataset.i]=+e.target.value;render();}));
+  function grid(Mx){return Mx.map(r=>r.map(v=>`<div class="mc">${v}</div>`).join('')).join('');}
+  function combine(Mx,a,b){return [a*Mx[0][0]+b*Mx[1][0], a*Mx[0][1]+b*Mx[1][1]];}
+  function render(){
+    $$('[data-v]').forEach(el=>{const i=+el.dataset.v;el.textContent=x[i];});
+    $$('#xsliders input').forEach(r=>r.value=x[+r.dataset.i]);
+    $('#xlab').textContent=`词向量 = [${x[0]}, ${x[1]}]`;
+    ['Q','K','V'].forEach(k=>{
+      const Mx=M[k];
+      $('#m'+k.toLowerCase()).innerHTML=grid(Mx);
+      const out=combine(Mx,x[0],x[1]);
+      $('#o'+k.toLowerCase()).innerHTML=out.map(v=>`<div class="c">${v}</div>`).join('');
+      $('#a'+k.toLowerCase()).innerHTML=`＝ ${x[0]}×[${Mx[0][0]},${Mx[0][1]}] + ${x[1]}×[${Mx[1][0]},${Mx[1][1]}]<br>＝ [${x[0]*Mx[0][0]},${x[0]*Mx[0][1]}] + [${x[1]*Mx[1][0]},${x[1]*Mx[1][1]}]`;
+    });
+  }
+  render();
+
+  const CORRECT={'1':'A','2':'F','3':'T','4':'B','5':'A'};
+  $$('.q').forEach(q=>{const opts=$$('.opt',q);opts.forEach(o=>o.addEventListener('click',()=>{if(q.dataset.locked)return;q.dataset.sel=o.dataset.a;opts.forEach(x=>x.classList.toggle('sel',x===o));}));});
+  $('#submitQuiz').addEventListener('click',()=>{
+    let score=0;const wrong=[];
+    ['1','2','3','4','5'].forEach(k=>{const q=$(`.q[data-q="${k}"]`);const opts=$$('.opt',q);const s=q.dataset.sel;opts.forEach(x=>x.classList.remove('right','wrong'));
+      if(s===CORRECT[k]){score++;opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');});}
+      else{opts.forEach(x=>{if(x.dataset.a===CORRECT[k])x.classList.add('right');if(x.dataset.a===s)x.classList.add('wrong');});wrong.push(s?('Q'+k):('Q'+k+' 还没选'));}q.dataset.locked='1';});
+    let h;
+    if(score===5){h=`<h3>✅ 过关！</h3><p>5 道全对。你已经懂：<strong>Q、K、V = 词向量 × 三个不同的矩阵；矩阵不同结果不同；矩阵是学出来的、所有词共用</strong>。</p>`;$('#quizResult').className='result show pass';$('#nextLink').classList.add('show');$('#quizStatus').textContent='5 / 5 全对';}
+    else{$('#nextLink').classList.remove('show');h=`<h3>再检查一下</h3><p>还有没对的，改完再提交：</p><ul><li>没过的题：${wrong.join('、')||'—'}（绿色=正确，红色=你选的）</li></ul>`;$('#quizResult').className='result show fail';$('#quizStatus').textContent=`${score} / 5 对`;}
+    $('#quizResult').innerHTML=h;$('#quizResult').scrollIntoView({behavior:'smooth',block:'center'});});
+})();
+</script>
+</body>
+</html>
